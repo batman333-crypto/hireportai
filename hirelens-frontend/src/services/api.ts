@@ -117,4 +117,17 @@ export async function deleteApplication(id: string): Promise<void> {
   await api.delete(`/api/tracker/${id}`)
 }
 
+export async function chatEditResume(
+  currentResume: RewriteResponse,
+  message: string,
+  jobDescription: string = ''
+): Promise<RewriteResponse> {
+  const response = await api.post<RewriteResponse>('/api/rewrite/chat', {
+    current_resume: currentResume,
+    message,
+    job_description: jobDescription,
+  })
+  return response.data
+}
+
 export default api

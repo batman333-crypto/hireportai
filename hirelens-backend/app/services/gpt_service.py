@@ -27,26 +27,29 @@ def _get_client():
         return None, None
 
 
+def _extract_json(text: str) -> str:
+    """Strip markdown code fences and extract raw JSON from model output."""
+    import re as _re
+    text = text.strip()
+    # Strip ```json ... ``` or ``` ... ``` wrappers
+    fenced = _re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
+    if fenced:
+        return fenced.group(1).strip()
+    # Find the outermost { ... } block
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        return text[start:end + 1]
+    return text
+
+
 def _generate(
     prompt: str,
     temperature: float = 0.7,
     max_tokens: int = 2000,
     json_mode: bool = False,
 ) -> str:
-    """Send a prompt to Gemini and return the response text.
-
-    Args:
-        prompt: The full prompt string.
-        temperature: Sampling temperature (0.0 - 1.0).
-        max_tokens: Maximum output tokens.
-        json_mode: Whether to request JSON-formatted output.
-
-    Returns:
-        Response text string.
-
-    Raises:
-        RuntimeError: If Gemini client is not configured.
-    """
+    """Send a prompt to Gemini and return the response text."""
     from google.genai import types
 
     client, model_name = _get_client()
@@ -65,7 +68,11 @@ def _generate(
         contents=prompt,
         config=types.GenerateContentConfig(**config_kwargs),
     )
-    return response.text or ""
+    raw = response.text or ""
+    # Always clean JSON output so markdown fences never break parsing
+    if json_mode:
+        raw = _extract_json(raw)
+    return raw
 
 
 def generate_job_fit_explanation(
@@ -147,33 +154,23 @@ def generate_resume_rewrite(
     resume_sk_str = ", ".join(resume_skills[:30])
     resp_str = "\n".join(f"- {r}" for r in responsibilities) if responsibilities else "N/A"
 
-    prompt = f"""You are an elite ATS optimization expert. Your job is to rewrite this resume so it achieves the HIGHEST POSSIBLE ATS score for the target role.
+    prompt = f"""You are an elite ATS optimization expert and professional resume writer. Rewrite this resume to achieve the HIGHEST POSSIBLE ATS score for the target role while keeping it on ONE PAGE.
 
-═══ ATS SCORING SYSTEM (your rewrite will be scored on these exact criteria) ═══
+═══ ATS SCORING CRITERIA ═══
 
-1. KEYWORD MATCH (40% of score):
-   The system extracts TF-IDF keywords from the job description and checks if each one appears in the resume text. Every keyword you include directly increases the score.
+1. KEYWORD MATCH (35%): Weave EVERY missing keyword below into bullets and the skills section using exact phrasing.
+   MISSING KEYWORDS: [{missing_kw_str}]
 
-   MISSING KEYWORDS TO ADD: [{missing_kw_str}]
-   ↳ You MUST weave as many of these as possible into bullet points and the skills section. Use the EXACT keyword phrasing where natural.
+2. SKILLS COVERAGE (25%): The skills section is machine-parsed. Add every plausible missing skill.
+   HAVE: [{resume_sk_str}]
+   ADD: [{missing_sk_str}]
+   → Infer adjacent skills from context: Python user likely knows Git, pip, venv; React dev likely knows HTML/CSS/JS; team lead likely has Agile, Project Management.
 
-2. SKILLS COVERAGE (25% of score):
-   The system checks how many JD skills appear in the resume's skill list (exact match, case-insensitive).
+3. EXPERIENCE ALIGNMENT (20%): Frame every bullet to mirror the JD's language and responsibilities. Reword experience to speak directly to what the employer is hiring for.
 
-   SKILLS ALREADY ON RESUME: [{resume_sk_str}]
-   MISSING SKILLS TO ADD: [{missing_sk_str}]
-   ↳ Add EVERY missing skill that the candidate could plausibly have based on their experience. Put them in the SKILLS section. If they used Python, they likely know pip, virtual environments, etc. If they used React, they likely know HTML, CSS, JavaScript. If they managed a team, they have Leadership, Communication, Project Management. Use your professional judgment to infer adjacent skills from their experience — but NEVER add skills that are completely unrelated to anything in their background.
+4. FORMATTING (10%): Single column, standard headings, no tables/graphics. ATS parsers fail on complex layouts.
 
-3. FORMATTING (20% of score):
-   Standard ATS-friendly section headings (EDUCATION, EXPERIENCE, SKILLS, etc.), single column, no tables/graphics/special characters. Include contact info in header.
-
-4. BULLET STRENGTH (15% of score):
-   Each bullet is scored 0-10 based on:
-   - Starts with a strong past-tense ACTION VERB (+3 pts): Achieved, Engineered, Spearheaded, Optimized, Deployed, Reduced, Increased, Led, Built, Automated, Streamlined, Implemented, Designed, Developed, Delivered, Managed, Created, Launched, Integrated, Architected
-   - Contains QUANTIFIED METRICS like %, $, numbers (+3 pts): "by 40%", "$50K", "15 team members", "3x improvement"
-   - Has 15+ words of specific detail (+2 pts)
-   - Contains JD-relevant keywords (+2 pts)
-   ↳ EVERY bullet must start with an action verb, include a number/metric, and mention a JD keyword.
+5. BULLET STRENGTH (10%): Action verb + specific task + quantified result + JD keyword. Every bullet.
 
 ═══ JOB CONTEXT ═══
 
@@ -183,52 +180,51 @@ REQUIRED SKILLS: {required_skills}
 KEY RESPONSIBILITIES:
 {resp_str}
 
-═══ SECTION MAPPING ═══
+═══ ONE-PAGE RULES (CRITICAL) ═══
 
-Read the original resume and map its content to these standard sections:
-- Education → "EDUCATION"
-- Work experience / internships → "EXPERIENCE"
-- Leadership roles, clubs, organizations → "LEADERSHIP & COMMUNITY INVOLVEMENT"
-- Personal or academic projects → "PROJECTS"
-- Research → "RESEARCH EXPERIENCE"
-- Teaching / tutoring → "TEACHING EXPERIENCE"
-- Volunteer work → "VOLUNTEER EXPERIENCE"
-- Awards, honors, scholarships → "HONORS & AWARDS"
-- Certifications → "CERTIFICATIONS"
-- Skills → "SKILLS"
+This resume MUST fit on a single page. To achieve this:
+- MAX 3-4 bullets per experience entry (keep each under 120 characters)
+- Education: org + degree + GPA + 1 line of relevant coursework (no more)
+- Projects: 2 bullets each maximum
+- Skills: single-line categories, no redundancy
+- Omit sections with no content relevant to this role
+- Prioritize: EXPERIENCE > SKILLS > EDUCATION > PROJECTS > LEADERSHIP (reorder for the role)
+
+═══ FORMAT (matching professional UT-style template) ═══
+
+Header: Name (centered, bold) + contact line (phone | email | linkedin | City, State)
+Sections: Bold underlined header left-aligned, company bold + date right-aligned, title italic
+Bullets: •  action verb + task + metric + keyword (no period at end)
 
 ═══ CRITICAL RULES ═══
 
-1. NEVER FABRICATE: Keep real company names, titles, dates, GPA. Do NOT invent new jobs, projects, or experiences. Only create sections for content that EXISTS in the original.
-2. OPTIMIZE WORDING: Reposition and reword existing experience to emphasize relevance to the target role. Frame the SAME work using JD language.
-3. INFER REASONABLE METRICS: If the original says "improved performance", you can say "Improved performance by 25%" if the context supports it. If they "led a team", estimate the size from context. Keep inferences realistic.
-4. HEADER: Extract REAL name, email, phone, LinkedIn, location. NEVER use placeholders.
-5. ORG NAMES: Copy EXACTLY from original resume.
-6. ENTRIES vs CONTENT: Experience-type sections use "entries" array. Skills/Honors use "content" string.
-7. SKILLS SECTION: Group by category. Include ALL skills from original resume PLUS plausible missing skills. This section alone drives 25% of the score.
-8. BULLETS: 2-4 per entry. Every bullet = action verb + what you did + quantified result + JD keyword.
-9. REORDER sections to put most relevant experience first (e.g., if applying for a tech role, put EXPERIENCE before LEADERSHIP).
-10. FULL_TEXT: Must contain the complete rewritten resume as plain text.
+1. NEVER FABRICATE new jobs, degrees, or projects. Only reword what EXISTS in the original.
+2. REAL DATA ONLY: Extract name, email, phone, LinkedIn, GPA from the original. Never use placeholders.
+3. ORG NAMES: Copy exactly from original resume.
+4. METRICS: If original says "improved X", you may add "by ~20-30%" if reasonable context supports it.
+5. SKILLS SECTION: Group by category (e.g., "Programming: Python, SQL, R | Tools: Excel, Tableau | Soft Skills: Leadership, Communication").
+6. ENTRIES use "entries" array. SKILLS/HONORS use "content" string.
 
-═══ JSON OUTPUT FORMAT ═══
+═══ JSON OUTPUT ═══
 
 {{
   "header": {{"name": "Full Name", "contact": "phone | email | linkedin | City, State"}},
   "sections": [
-    {{"title": "EDUCATION", "content": "", "entries": [{{"org": "University Name, City, State", "date": "May 2024", "title": "Bachelor of Science in Major, GPA: X.XX", "details": ["Relevant Coursework: Course1, Course2, Course3"], "bullets": []}}]}},
-    {{"title": "EXPERIENCE", "content": "", "entries": [{{"org": "Company Name", "date": "June 2023 - Present", "title": "Job Title", "details": [], "bullets": ["Engineered automated data pipeline using Python and AWS Lambda, reducing processing time by 40% and saving 15 engineering hours weekly"]}}]}},
-    {{"title": "SKILLS", "content": "Programming Languages: Python, Java, JavaScript\\nFrameworks: React, Node.js, FastAPI\\nTools: Git, Docker, AWS, Kubernetes\\nSoft Skills: Leadership, Communication, Agile", "entries": []}}
+    {{"title": "EDUCATION", "content": "", "entries": [{{"org": "University Name, City, State", "date": "May 2027", "title": "Bachelor of Science in Major, GPA: X.XX", "details": ["Relevant Coursework: Course1, Course2"], "bullets": []}}]}},
+    {{"title": "EXPERIENCE", "content": "", "entries": [{{"org": "Company Name, City, State", "date": "June 2023 – Present", "title": "Job Title", "details": [], "bullets": ["Led development of X using Python and AWS, reducing processing time by 35% and saving 10 engineering hours weekly", "Implemented Y algorithm resulting in 20% improvement in Z metric"]}}]}},
+    {{"title": "SKILLS", "content": "Programming Languages: Python, Java, SQL | Frameworks: React, FastAPI | Tools: Git, Docker, AWS | Soft Skills: Leadership, Agile, Communication", "entries": []}}
   ],
-  "full_text": "Complete resume as plain text"
+  "full_text": "Complete resume as plain text (same content as structured data above)"
 }}
 
 ═══ ORIGINAL RESUME ═══
 
 {resume_text}"""
 
+    ai_output = ""
     try:
-        response_text = _generate(prompt, temperature=0.4, max_tokens=4000, json_mode=True)
-        data = json.loads(response_text)
+        ai_output = _generate(prompt, temperature=0.4, max_tokens=6000, json_mode=True)
+        data = json.loads(ai_output)
 
         header = RewriteHeader(
             name=data.get("header", {}).get("name", ""),
@@ -239,19 +235,25 @@ Read the original resume and map its content to these standard sections:
         for s in data.get("sections", []):
             entries = []
             for e in s.get("entries", []):
+                bullets = e.get("bullets", [])
+                if bullets and isinstance(bullets[0], dict):
+                    bullets = [b.get("text", str(b)) for b in bullets]
                 entries.append(RewriteEntry(
                     org=e.get("org", ""),
                     location=e.get("location", ""),
                     date=e.get("date", ""),
                     title=e.get("title", ""),
-                    bullets=e.get("bullets", []),
-                    details=e.get("details", []),
+                    bullets=[str(b) for b in bullets],
+                    details=[str(d) for d in e.get("details", [])],
                 ))
             sections.append(RewriteSection(
                 title=s.get("title", ""),
                 content=s.get("content", ""),
                 entries=entries,
             ))
+
+        if not sections:
+            sections = _parse_plain_text_to_sections(data.get("full_text", resume_text))
 
         return RewriteResponse(
             header=header,
@@ -260,17 +262,84 @@ Read the original resume and map its content to these standard sections:
             template_type=template_type,
         )
     except Exception:
-        sections_data = resume_data.get("sections", {})
-        sections = [
-            RewriteSection(title=k.title(), content=v)
-            for k, v in sections_data.items()
-        ]
+        # Use the AI's raw output (even if not valid JSON) so the user sees
+        # the rewritten content, not just their original resume.
+        fallback_text = ai_output if ai_output.strip() else resume_text
+        # Strip any leftover JSON syntax so it reads as plain text
+        import re as _re
+        fallback_text = _re.sub(r'^\s*\{.*?"full_text"\s*:\s*"', '', fallback_text, flags=_re.DOTALL)
+        fallback_text = fallback_text.strip().strip('"').strip()
+        if not fallback_text or len(fallback_text) < 50:
+            fallback_text = resume_text
         return RewriteResponse(
             header=RewriteHeader(),
-            sections=sections if sections else [RewriteSection(title="Resume", content=resume_text)],
-            full_text=resume_text,
+            sections=[],          # empty → frontend uses PlainTextFallback
+            full_text=fallback_text,
             template_type=template_type,
         )
+
+
+def _parse_plain_text_to_sections(text: str) -> List[RewriteSection]:
+    """Convert plain-text resume into structured RewriteSection list."""
+    import re as _re
+    SECTION_HEADERS = {
+        "EDUCATION", "EXPERIENCE", "WORK EXPERIENCE", "PROJECTS",
+        "SKILLS", "TECHNICAL SKILLS", "LEADERSHIP", "LEADERSHIP EXPERIENCE",
+        "LEADERSHIP & COMMUNITY INVOLVEMENT", "LEADERSHIP EXPERIENCE AND ACTIVITIES",
+        "CAMPUS INVOLVEMENT", "COMMUNITY INVOLVEMENT", "HONORS", "HONORS & AWARDS",
+        "AWARDS", "CERTIFICATIONS", "RESEARCH", "RESEARCH EXPERIENCE",
+        "VOLUNTEER", "VOLUNTEER EXPERIENCE", "ACTIVITIES",
+    }
+
+    lines = text.split("\n")
+    sections: List[RewriteSection] = []
+    current_title = ""
+    current_lines: List[str] = []
+    name_line = ""
+    contact_line = ""
+
+    # Try to extract header (first 3 non-empty lines before first section)
+    header_lines = []
+    first_section_idx = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.upper() in SECTION_HEADERS or any(stripped.upper().startswith(h) for h in SECTION_HEADERS):
+            first_section_idx = i
+            break
+        if stripped:
+            header_lines.append(stripped)
+
+    if header_lines:
+        name_line = header_lines[0] if header_lines else ""
+        contact_line = " | ".join(header_lines[1:3]) if len(header_lines) > 1 else ""
+
+    def flush():
+        if current_title and current_lines:
+            content = "\n".join(current_lines).strip()
+            sections.append(RewriteSection(title=current_title, content=content, entries=[]))
+
+    for line in lines[first_section_idx:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        upper = stripped.upper()
+        if upper in SECTION_HEADERS or any(upper == h for h in SECTION_HEADERS):
+            flush()
+            current_title = stripped.upper()
+            current_lines = []
+        else:
+            current_lines.append(stripped)
+    flush()
+
+    # Build a dummy header section so the name/contact renders
+    if name_line and not any(s.title == "HEADER" for s in sections):
+        sections.insert(0, RewriteSection(
+            title="__HEADER__",
+            content=f"{name_line}\n{contact_line}",
+            entries=[],
+        ))
+
+    return sections if sections else [RewriteSection(title="RESUME", content=text, entries=[])]
 
 
 def generate_cover_letter(
@@ -410,6 +479,109 @@ Make questions specific to the role and candidate's background."""
             ),
         ]
         return InterviewPrepResponse(questions=default_questions)
+
+
+def chat_resume_edit(
+    current_resume: dict,
+    message: str,
+    job_description: str = "",
+) -> "RewriteResponse":
+    """Apply a conversational edit instruction to the current resume.
+
+    The user can say things like:
+    - "Add a bullet about my Python experience in the software role"
+    - "Remove the honors section"
+    - "Make the experience section more focused on data analysis"
+    - "Change my GPA to 3.7"
+    - "Add SQL to my skills"
+
+    Returns an updated RewriteResponse.
+    """
+    import json as _json
+
+    # Serialize the current resume to a readable format for the prompt
+    resume_json = _json.dumps(current_resume, indent=2)
+
+    prompt = f"""You are an expert resume editor. The user has an ATS-optimized resume and wants to make a specific change.
+
+CURRENT RESUME (JSON structure):
+{resume_json}
+
+JOB DESCRIPTION CONTEXT:
+{job_description[:1000] if job_description else "Not provided"}
+
+USER REQUEST:
+"{message}"
+
+Apply EXACTLY what the user requested — nothing more, nothing less. Preserve all other content.
+
+Rules:
+1. Only change what the user asked for. Keep everything else identical.
+2. Maintain ATS-friendly formatting (action verbs, metrics, keywords).
+3. Keep the resume to ONE PAGE worth of content.
+4. If the user asks to add a skill, add it to the appropriate skills category.
+5. If the user asks to add a bullet, make it start with an action verb and include a metric where possible.
+6. If the user asks to remove something, delete it completely.
+7. NEVER invent new jobs, companies, or degrees.
+
+Return the COMPLETE updated resume in the exact same JSON structure:
+{{
+  "header": {{"name": "...", "contact": "..."}},
+  "sections": [...],
+  "full_text": "complete plain text version"
+}}"""
+
+    try:
+        response_text = _generate(prompt, temperature=0.3, max_tokens=4000, json_mode=True)
+        data = _json.loads(response_text)
+
+        header = RewriteHeader(
+            name=data.get("header", {}).get("name", current_resume.get("header", {}).get("name", "")),
+            contact=data.get("header", {}).get("contact", current_resume.get("header", {}).get("contact", "")),
+        )
+
+        sections = []
+        for s in data.get("sections", []):
+            entries = []
+            for e in s.get("entries", []):
+                entries.append(RewriteEntry(
+                    org=e.get("org", ""),
+                    location=e.get("location", ""),
+                    date=e.get("date", ""),
+                    title=e.get("title", ""),
+                    bullets=e.get("bullets", []),
+                    details=e.get("details", []),
+                ))
+            sections.append(RewriteSection(
+                title=s.get("title", ""),
+                content=s.get("content", ""),
+                entries=entries,
+            ))
+
+        return RewriteResponse(
+            header=header,
+            sections=sections,
+            full_text=data.get("full_text", ""),
+            template_type=current_resume.get("template_type", "general"),
+        )
+    except Exception:
+        # Return current resume unchanged on failure
+        sections = []
+        for s in current_resume.get("sections", []):
+            entries = [
+                RewriteEntry(**e) for e in s.get("entries", [])
+            ]
+            sections.append(RewriteSection(
+                title=s.get("title", ""),
+                content=s.get("content", ""),
+                entries=entries,
+            ))
+        return RewriteResponse(
+            header=RewriteHeader(**current_resume.get("header", {})),
+            sections=sections,
+            full_text=current_resume.get("full_text", ""),
+            template_type=current_resume.get("template_type", "general"),
+        )
 
 
 def rewrite_bullets_gpt(

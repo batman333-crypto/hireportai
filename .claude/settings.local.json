@@ -54,7 +54,9 @@
       "Bash(grep -r stripe /Users/yashu/GenAI/hirelensai --include=*.tsx --include=*.ts --include=*.py --exclude-dir=node_modules --exclude-dir=venv)",
       "Bash(grep -r checkout /Users/yashu/GenAI/hirelensai --include=*.tsx --include=*.ts --include=*.py --exclude-dir=node_modules --exclude-dir=venv)",
       "Bash(grep -r billing /Users/yashu/GenAI/hirelensai --include=*.tsx --include=*.ts --include=*.py --exclude-dir=node_modules --exclude-dir=venv)",
-      "Bash(python -c \"from app.services.nlp import get_nlp; nlp = get_nlp\\(\\); print\\(''spaCy available:'', nlp is not None\\)\")"
+      "Bash(python -c \"from app.services.nlp import get_nlp; nlp = get_nlp\\(\\); print\\(''spaCy available:'', nlp is not None\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/rewrite -H 'Content-Type: application/json' -d '{\"resume_text\": \"John Smith\\\\njsmith@email.com\\\\n\\\\nEDUCATION\\\\nUT Austin May 2025\\\\nBS CS\\\\n\\\\nEXPERIENCE\\\\nBank June 2024 - August 2024\\\\nIntern\\\\n- Built Python scripts\", \"job_description\": \"Python developer\"}')",
+      "Bash(git add *)"
     ]
   }
 }

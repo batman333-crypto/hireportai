@@ -3,6 +3,7 @@ from app.schemas.requests import (  # noqa: F401
     AnalysisOptions,
     CoverLetterRequest,
     InterviewPrepRequest,
+    ResumeChatRequest,
     RewriteRequest,
     TrackerApplicationCreate,
     TrackerApplicationUpdate,
@@ -13,6 +14,7 @@ __all__ = [
     "RewriteRequest",
     "CoverLetterRequest",
     "InterviewPrepRequest",
+    "ResumeChatRequest",
     "TrackerApplicationCreate",
     "TrackerApplicationUpdate",
 ]

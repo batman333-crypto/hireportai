@@ -137,6 +137,9 @@ async def analyze_resume(
         jd_skills=jd_skills,
         formatting_issues=formatting_issues_dicts,
         bullets=bullet_dicts,
+        resume_text=resume_text,
+        jd_requirements=jd_requirements,
+        keyword_frequency_data=keyword_results.get("frequency_data", []),
     )
 
     # Skill gap detection

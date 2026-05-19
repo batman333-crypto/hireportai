@@ -7,17 +7,18 @@ interface ScoreBreakdownProps {
 }
 
 const SCORE_ITEMS = [
-  { key: 'keyword_match' as const, label: 'Keyword Match', weight: '40%' },
+  { key: 'keyword_match' as const, label: 'Keyword Match', weight: '35%' },
   { key: 'skills_coverage' as const, label: 'Skills Coverage', weight: '25%' },
-  { key: 'formatting_compliance' as const, label: 'Formatting Compliance', weight: '20%' },
-  { key: 'bullet_strength' as const, label: 'Bullet Strength', weight: '15%' },
+  { key: 'experience_alignment' as const, label: 'Experience Alignment', weight: '20%' },
+  { key: 'formatting_compliance' as const, label: 'Formatting Compliance', weight: '10%' },
+  { key: 'bullet_strength' as const, label: 'Bullet Strength', weight: '10%' },
 ]
 
 export function ScoreBreakdown({ breakdown }: ScoreBreakdownProps) {
   return (
     <div className="space-y-5">
       {SCORE_ITEMS.map(({ key, label, weight }, i) => {
-        const value = breakdown[key]
+        const value = breakdown[key] ?? 65
         return (
           <motion.div
             key={key}

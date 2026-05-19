@@ -1,5 +1,5 @@
 """Pydantic v2 request models for HirePort AI API."""
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -40,6 +40,14 @@ class InterviewPrepRequest(BaseModel):
 
     resume_text: str = Field(..., min_length=50)
     job_description: str = Field(..., min_length=50)
+
+
+class ResumeChatRequest(BaseModel):
+    """Request body for conversational resume editing."""
+
+    current_resume: Dict[str, Any] = Field(..., description="Current RewriteResponse as dict")
+    message: str = Field(..., min_length=1, description="User's edit instruction")
+    job_description: str = Field(default="", description="Original job description for context")
 
 
 class TrackerApplicationCreate(BaseModel):

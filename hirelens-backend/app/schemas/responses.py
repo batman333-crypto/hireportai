@@ -9,6 +9,7 @@ class ATSScoreBreakdown(BaseModel):
 
     keyword_match: float
     skills_coverage: float
+    experience_alignment: float = 65.0
     formatting_compliance: float
     bullet_strength: float
 

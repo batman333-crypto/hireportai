@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import type { RewriteResponse } from '@/types'
 import { FileText, PenTool, Download, MessageSquare, Lock, Crown, Zap, FileDown } from 'lucide-react'
 import clsx from 'clsx'
 import { PageWrapper } from '@/components/layout/PageWrapper'
@@ -71,6 +72,7 @@ export default function Rewrite() {
   const { canUsePremium } = useUsage()
   const [activeTab, setActiveTab] = useState<TabId>('resume')
   const [isExportingPDF, setIsExportingPDF] = useState(false)
+  const [liveRewrite, setLiveRewrite] = useState<RewriteResponse | null>(null)
   const {
     rewriteResult,
     coverLetter,
@@ -80,14 +82,22 @@ export default function Rewrite() {
     runCoverLetter,
   } = useRewrite()
 
+  // Keep liveRewrite in sync when a fresh AI rewrite arrives
+  useEffect(() => {
+    if (rewriteResult) setLiveRewrite(rewriteResult)
+  }, [rewriteResult])
+
   const resumeText = state.result?.resume_text || ''
   const jobDescription = state.jobDescription || ''
 
+  // Always export the latest version (may have been edited via chat)
+  const exportTarget = liveRewrite || rewriteResult
+
   const handleDownloadPDF = async () => {
-    if (!rewriteResult) return
+    if (!exportTarget) return
     setIsExportingPDF(true)
     try {
-      const r = rewriteResult
+      const r = exportTarget
       const { jsPDF } = await import('jspdf')
       const doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'portrait' })
 
@@ -309,10 +319,10 @@ export default function Rewrite() {
   }
 
   const handleDownloadDocx = async () => {
-    if (!rewriteResult) return
+    if (!exportTarget) return
     setIsExportingPDF(true)
     try {
-      await downloadResumeDocx(rewriteResult)
+      await downloadResumeDocx(exportTarget)
     } finally {
       setIsExportingPDF(false)
     }
@@ -372,7 +382,7 @@ export default function Rewrite() {
 
           {canUsePremium && (
             <div className="flex items-center gap-3">
-              {activeTab === 'resume' && !rewriteResult && (
+              {activeTab === 'resume' && !exportTarget && (
                 <GlowButton
                   size="sm"
                   onClick={() => runRewrite(resumeText, jobDescription)}
@@ -382,8 +392,17 @@ export default function Rewrite() {
                   Generate AI Rewrite
                 </GlowButton>
               )}
-              {activeTab === 'resume' && rewriteResult && (
+              {activeTab === 'resume' && exportTarget && (
                 <>
+                  <GlowButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => runRewrite(resumeText, jobDescription)}
+                    isLoading={isLoadingRewrite}
+                  >
+                    <PenTool size={13} />
+                    Regenerate
+                  </GlowButton>
                   <GlowButton
                     variant="ghost"
                     size="sm"
@@ -446,11 +465,12 @@ export default function Rewrite() {
               {activeTab === 'resume' ? (
                 <ResumeEditor
                   original={resumeText}
-                  rewrite={rewriteResult}
+                  rewrite={liveRewrite}
                   isLoading={isLoadingRewrite}
                   onDownloadPDF={handleDownloadPDF}
                   onDownloadDocx={handleDownloadDocx}
                   isExportingPDF={isExportingPDF}
+                  onRewriteUpdate={setLiveRewrite}
                 />
               ) : (
                 <CoverLetterViewer

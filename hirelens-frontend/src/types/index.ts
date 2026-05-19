@@ -3,6 +3,7 @@
 export interface ATSScoreBreakdown {
   keyword_match: number
   skills_coverage: number
+  experience_alignment: number
   formatting_compliance: number
   bullet_strength: number
 }
