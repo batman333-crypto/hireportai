@@ -481,76 +481,141 @@ Make questions specific to the role and candidate's background."""
         return InterviewPrepResponse(questions=default_questions)
 
 
+def _rebuild_sections_from_dict(sections_raw: list) -> List[RewriteSection]:
+    """Reconstruct RewriteSection list from raw dicts (for fallback paths)."""
+    sections = []
+    for s in (sections_raw or []):
+        entries = []
+        for e in s.get("entries", []):
+            bullets = e.get("bullets", [])
+            if bullets and isinstance(bullets[0], dict):
+                bullets = [b.get("text", str(b)) for b in bullets]
+            entries.append(RewriteEntry(
+                org=e.get("org", ""),
+                location=e.get("location", ""),
+                date=e.get("date", ""),
+                title=e.get("title", ""),
+                bullets=[str(b) for b in bullets],
+                details=[str(d) for d in e.get("details", [])],
+            ))
+        sections.append(RewriteSection(
+            title=s.get("title", ""),
+            content=s.get("content", ""),
+            entries=entries,
+        ))
+    return sections
+
+
 def chat_resume_edit(
     current_resume: dict,
     message: str,
     job_description: str = "",
 ) -> "RewriteResponse":
-    """Apply a conversational edit instruction to the current resume.
+    """Apply a conversational edit to the current resume.
 
-    The user can say things like:
-    - "Add a bullet about my Python experience in the software role"
-    - "Remove the honors section"
-    - "Make the experience section more focused on data analysis"
-    - "Change my GPA to 3.7"
-    - "Add SQL to my skills"
-
-    Returns an updated RewriteResponse.
+    Handles any instruction: add/remove/reword bullets, change skills,
+    reformat sections, update GPA, alter tone, etc.
     """
     import json as _json
 
-    # Serialize the current resume to a readable format for the prompt
-    resume_json = _json.dumps(current_resume, indent=2)
+    # Build a clean plain-text view of the resume for the prompt,
+    # so Gemini can reason about content without being confused by JSON escaping.
+    current_full_text = current_resume.get("full_text", "")
+    current_header = current_resume.get("header", {})
+    current_sections_raw = current_resume.get("sections", [])
 
-    prompt = f"""You are an expert resume editor. The user has an ATS-optimized resume and wants to make a specific change.
+    # Also pass the compact JSON so Gemini knows the exact structure to return.
+    resume_json = _json.dumps(current_resume, indent=2)[:6000]
 
-CURRENT RESUME (JSON structure):
+    prompt = f"""You are a precision resume editor. Your ONLY job is to apply the user's requested change to the resume below and return the COMPLETE updated resume in JSON.
+
+═══ CURRENT RESUME (JSON) ═══
 {resume_json}
 
-JOB DESCRIPTION CONTEXT:
-{job_description[:1000] if job_description else "Not provided"}
-
-USER REQUEST:
+═══ USER'S REQUESTED CHANGE ═══
 "{message}"
 
-Apply EXACTLY what the user requested — nothing more, nothing less. Preserve all other content.
+═══ JOB CONTEXT (optional) ═══
+{job_description[:800] if job_description else "N/A"}
 
-Rules:
-1. Only change what the user asked for. Keep everything else identical.
-2. Maintain ATS-friendly formatting (action verbs, metrics, keywords).
-3. Keep the resume to ONE PAGE worth of content.
-4. If the user asks to add a skill, add it to the appropriate skills category.
-5. If the user asks to add a bullet, make it start with an action verb and include a metric where possible.
-6. If the user asks to remove something, delete it completely.
-7. NEVER invent new jobs, companies, or degrees.
+═══ HOW TO APPLY THE CHANGE ═══
 
-Return the COMPLETE updated resume in the exact same JSON structure:
+Identify exactly what the user wants:
+- ADD bullet → insert a new bullet starting with an action verb + metric into the right section/entry
+- REMOVE bullet/section/skill → delete it entirely, leave everything else intact
+- REWORD/EDIT text → change only that specific text
+- ADD skill → append to the appropriate skill category in the SKILLS section content string
+- CHANGE format → apply the formatting change (e.g. reorder sections, change header layout)
+- CHANGE content → update only the specific field the user mentioned
+
+═══ RULES ═══
+1. Apply ONLY what was requested — do NOT rewrite or touch anything else
+2. Preserve all other sections, bullets, entries, and formatting exactly as-is
+3. Every bullet must start with a strong action verb (Led, Built, Designed, Implemented, Analyzed…)
+4. Keep bullets under 120 characters each
+5. NEVER fabricate new companies, degrees, or jobs
+6. Skills section uses "content" string format: "Category: skill1, skill2 | Category2: skill3"
+7. Update "full_text" to accurately reflect ALL changes in plain text form
+
+═══ REQUIRED JSON OUTPUT ═══
+
+Return this EXACT structure (no extra keys, no markdown fences):
 {{
-  "header": {{"name": "...", "contact": "..."}},
-  "sections": [...],
-  "full_text": "complete plain text version"
+  "header": {{
+    "name": "{current_header.get('name', 'Full Name')}",
+    "contact": "{current_header.get('contact', 'phone | email | linkedin | City, State')}"
+  }},
+  "sections": [
+    {{
+      "title": "SECTION NAME",
+      "content": "",
+      "entries": [
+        {{
+          "org": "Organization Name, City, State",
+          "location": "",
+          "date": "Month YYYY – Month YYYY",
+          "title": "Job/Degree Title",
+          "details": ["Relevant Coursework: ..."],
+          "bullets": [
+            "Action verb + specific task + quantified result"
+          ]
+        }}
+      ]
+    }},
+    {{
+      "title": "SKILLS",
+      "content": "Programming: Python, SQL | Tools: Git, Docker | Soft Skills: Leadership",
+      "entries": []
+    }}
+  ],
+  "full_text": "Complete resume as clean plain text — same content as sections above"
 }}"""
 
     try:
-        response_text = _generate(prompt, temperature=0.3, max_tokens=4000, json_mode=True)
+        response_text = _generate(prompt, temperature=0.2, max_tokens=6000, json_mode=True)
         data = _json.loads(response_text)
 
+        # Fallback header values to current if AI dropped them
+        cur_h = current_resume.get("header", {})
         header = RewriteHeader(
-            name=data.get("header", {}).get("name", current_resume.get("header", {}).get("name", "")),
-            contact=data.get("header", {}).get("contact", current_resume.get("header", {}).get("contact", "")),
+            name=data.get("header", {}).get("name", "") or cur_h.get("name", ""),
+            contact=data.get("header", {}).get("contact", "") or cur_h.get("contact", ""),
         )
 
         sections = []
         for s in data.get("sections", []):
             entries = []
             for e in s.get("entries", []):
+                bullets = e.get("bullets", [])
+                if bullets and isinstance(bullets[0], dict):
+                    bullets = [b.get("text", str(b)) for b in bullets]
                 entries.append(RewriteEntry(
                     org=e.get("org", ""),
                     location=e.get("location", ""),
                     date=e.get("date", ""),
                     title=e.get("title", ""),
-                    bullets=e.get("bullets", []),
-                    details=e.get("details", []),
+                    bullets=[str(b) for b in bullets],
+                    details=[str(d) for d in e.get("details", [])],
                 ))
             sections.append(RewriteSection(
                 title=s.get("title", ""),
@@ -558,28 +623,29 @@ Return the COMPLETE updated resume in the exact same JSON structure:
                 entries=entries,
             ))
 
+        # If AI returned no sections, preserve the original
+        if not sections:
+            sections = _rebuild_sections_from_dict(current_sections_raw)
+
+        updated_full_text = data.get("full_text", "") or current_full_text
+
         return RewriteResponse(
             header=header,
             sections=sections,
-            full_text=data.get("full_text", ""),
+            full_text=updated_full_text,
             template_type=current_resume.get("template_type", "general"),
         )
-    except Exception:
-        # Return current resume unchanged on failure
-        sections = []
-        for s in current_resume.get("sections", []):
-            entries = [
-                RewriteEntry(**e) for e in s.get("entries", [])
-            ]
-            sections.append(RewriteSection(
-                title=s.get("title", ""),
-                content=s.get("content", ""),
-                entries=entries,
-            ))
+
+    except Exception as _exc:
+        # Preserve the current resume exactly — never silently drop content
+        sections = _rebuild_sections_from_dict(current_sections_raw)
         return RewriteResponse(
-            header=RewriteHeader(**current_resume.get("header", {})),
+            header=RewriteHeader(
+                name=current_header.get("name", ""),
+                contact=current_header.get("contact", ""),
+            ),
             sections=sections,
-            full_text=current_resume.get("full_text", ""),
+            full_text=current_full_text,
             template_type=current_resume.get("template_type", "general"),
         )
 

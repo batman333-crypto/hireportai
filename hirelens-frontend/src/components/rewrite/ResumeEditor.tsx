@@ -348,13 +348,29 @@ function ResumeChat({
     try {
       const updated = await chatEditResume(rewrite, text, jobDescription)
       onUpdate(updated)
+
+      // Build a contextual reply that references what the user asked for
+      const lower = text.toLowerCase()
+      let reply = "Done! I've applied your change — check the preview on the right. What else would you like to adjust?"
+      if (lower.includes('add') && lower.includes('bullet')) {
+        reply = "Added the bullet. It leads with an action verb and includes a metric where possible. Want me to tweak the wording?"
+      } else if (lower.includes('remove') || lower.includes('delete')) {
+        reply = "Removed. The rest of your resume is untouched. Anything else to clean up?"
+      } else if (lower.includes('reword') || lower.includes('rephrase') || lower.includes('change the wording')) {
+        reply = "Reworded it. Take a look at the preview — let me know if you want a different angle."
+      } else if (lower.includes('skill') || lower.includes('add') && lower.includes('skill')) {
+        reply = "Added to your skills section. Want me to group it under a specific category?"
+      } else if (lower.includes('gpa') || lower.includes('grade')) {
+        reply = "Updated your GPA. Anything else in the education section to change?"
+      } else if (lower.includes('summary') || lower.includes('objective')) {
+        reply = "Added the summary at the top. Want me to adjust the tone or length?"
+      } else if (lower.includes('format') || lower.includes('reorder') || lower.includes('move')) {
+        reply = "Reformatted as requested. Check the preview — want any other layout changes?"
+      }
+
       setMessages((prev) => [
         ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: "Done! I've updated your resume. You can see the changes in the preview. Want anything else?",
-        },
+        { id: (Date.now() + 1).toString(), role: 'assistant', content: reply },
       ])
     } catch {
       setMessages((prev) => [
@@ -362,7 +378,7 @@ function ResumeChat({
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: 'Something went wrong. Please try again.',
+          content: "Hmm, something went wrong applying that change. Try rephrasing — e.g. \"Add a bullet to Bank of America: Led X to achieve Y\"",
           isError: true,
         },
       ])
@@ -457,7 +473,7 @@ function ResumeChat({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
             disabled={isThinking}
-            placeholder='e.g. "Add a bullet about my Python experience" or "Remove the honors section"'
+            placeholder='e.g. "Add a bullet to Google: Led migration to AWS reducing costs 30%" or "Remove honors section"'
             className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-text-primary placeholder:text-text-muted outline-none focus:border-accent-primary/40 focus:bg-white/[0.07] transition-all disabled:opacity-50"
           />
           <button
