@@ -65,37 +65,33 @@ function parseContentLines(content: string): LineBlock[] {
 }
 
 /**
- * Render section content text with UT-style formatting:
- * - Org + date lines → bold left, date right-aligned
- * - Title line (after org) → italic
- * - Bullet lines → bullet point
- * - Detail lines → indented
- * Used for sections that arrived as plain `content` strings (e.g. from fallback parser)
+ * Render section content text with UT-style formatting.
+ * Used for Skills/Honors sections that have a `content` string instead of entries[].
  */
 function SectionContentRenderer({ content }: { content: string }) {
   const blocks = parseContentLines(content)
   return (
-    <div className="text-[10px] text-gray-800 leading-snug">
+    <div style={{ fontSize: '12px', color: '#222', lineHeight: '1.45' }}>
       {blocks.map((b, i) => {
         if (b.type === 'orgdate')
           return (
-            <div key={i} className="flex justify-between items-baseline gap-2 mt-2">
-              <span className="font-bold text-gray-900 text-[10.5px]">{b.org}</span>
-              <span className="text-gray-600 text-[10px] whitespace-nowrap flex-shrink-0">{b.date}</span>
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px', marginTop: '8px' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#111' }}>{b.org}</span>
+              <span style={{ fontSize: '12px', color: '#333', whiteSpace: 'nowrap', flexShrink: 0 }}>{b.date}</span>
             </div>
           )
         if (b.type === 'title')
-          return <p key={i} className="text-gray-700 text-[10.5px] italic">{b.text}</p>
+          return <p key={i} style={{ fontStyle: 'italic', fontSize: '12.5px', color: '#333', margin: '1px 0' }}>{b.text}</p>
         if (b.type === 'bullet')
           return (
-            <div key={i} className="flex gap-1.5 leading-snug mt-0.5">
-              <span className="flex-shrink-0">•</span>
+            <div key={i} style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+              <span style={{ flexShrink: 0 }}>•</span>
               <span>{b.text}</span>
             </div>
           )
         if (b.type === 'detail')
-          return <p key={i} className="pl-3 mt-0.5 text-gray-700">{b.text}</p>
-        return <p key={i} className="mt-0.5">{b.text}</p>
+          return <p key={i} style={{ paddingLeft: '16px', margin: '2px 0', color: '#444' }}>{b.text}</p>
+        return <p key={i} style={{ margin: '2px 0' }}>{b.text}</p>
       })}
     </div>
   )
@@ -104,32 +100,41 @@ function SectionContentRenderer({ content }: { content: string }) {
 /** Full formatted resume preview matching UT/professional template */
 function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
   const hasStructuredHeader = !!(rewrite.header?.name?.trim())
-  // True only when at least one section has typed entries (org/title/bullets)
   const hasStructuredEntries = rewrite.sections.some((s) =>
     s.entries?.some((e) => e.org || e.title || (e.bullets && e.bullets.length > 0))
   )
 
-  // No structured header or no entry-based sections → use PlainTextFallback on full_text
   if ((!hasStructuredHeader || !hasStructuredEntries) && rewrite.full_text) {
     return <PlainTextFallback text={rewrite.full_text} />
   }
 
   return (
     <div
-      className="bg-white rounded-xl shadow-lg p-8"
-      style={{ fontFamily: "'Times New Roman', Times, serif" }}
+      className="bg-white rounded-xl shadow-lg"
+      style={{
+        fontFamily: "'Times New Roman', Times, serif",
+        padding: '40px 48px',
+        maxWidth: '780px',
+        margin: '0 auto',
+      }}
     >
       {/* Header */}
       {hasStructuredHeader && (
-        <div className="text-center mb-4 pb-3 border-b-[1.5px] border-gray-800">
+        <div className="text-center pb-3 mb-4" style={{ borderBottom: '1.5px solid #1a1a1a' }}>
           <h1
-            className="text-[17px] font-bold text-gray-900 uppercase"
-            style={{ letterSpacing: '0.08em' }}
+            style={{
+              fontSize: '22px',
+              fontWeight: 'bold',
+              color: '#111',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              margin: 0,
+            }}
           >
             {rewrite.header.name}
           </h1>
           {rewrite.header.contact && (
-            <p className="text-[10px] text-gray-600 mt-1.5">
+            <p style={{ fontSize: '12px', color: '#444', marginTop: '6px' }}>
               {rewrite.header.contact}
             </p>
           )}
@@ -146,41 +151,52 @@ function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
         if (!hasEntries && !hasContent) return null
 
         return (
-          <div key={i} className={i === 0 && hasStructuredHeader ? '' : i === 0 ? '' : 'mt-3'}>
+          <div key={i} style={{ marginTop: i === 0 ? '0' : '14px' }}>
             {/* Section heading */}
-            <div className="border-b border-gray-800 mb-1.5">
-              <h2 className="text-[11px] font-bold text-gray-900 tracking-[0.1em] uppercase pb-0.5">
+            <div style={{ borderBottom: '1px solid #1a1a1a', marginBottom: '6px' }}>
+              <h2
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  color: '#111',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  margin: '0 0 2px 0',
+                }}
+              >
                 {section.title}
               </h2>
             </div>
 
-            {/* Structured entries (Experience, Education, Projects…) */}
+            {/* Structured entries */}
             {hasEntries &&
               section.entries.map((entry, j) => (
-                <div key={j} className={j === 0 ? '' : 'mt-2'}>
+                <div key={j} style={{ marginTop: j === 0 ? '4px' : '10px' }}>
                   {(entry.org || entry.date) && (
-                    <div className="flex justify-between items-baseline gap-2">
-                      <span className="font-bold text-gray-900 text-[10.5px]">{entry.org}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#111' }}>{entry.org}</span>
                       {entry.date && (
-                        <span className="text-gray-600 text-[10px] whitespace-nowrap flex-shrink-0">
+                        <span style={{ fontSize: '12px', color: '#333', whiteSpace: 'nowrap', flexShrink: 0 }}>
                           {entry.date}
                         </span>
                       )}
                     </div>
                   )}
                   {entry.title && (
-                    <p className="text-gray-700 text-[10.5px] italic">{entry.title}</p>
+                    <p style={{ fontStyle: 'italic', fontSize: '12.5px', color: '#333', margin: '1px 0' }}>
+                      {entry.title}
+                    </p>
                   )}
                   {entry.details?.map((d, k) =>
                     d.trim() ? (
-                      <p key={k} className="text-gray-700 text-[10px] pl-3 mt-0.5">{d}</p>
+                      <p key={k} style={{ fontSize: '12px', color: '#444', paddingLeft: '16px', margin: '2px 0' }}>{d}</p>
                     ) : null
                   )}
                   {entry.bullets && entry.bullets.length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
+                    <ul style={{ margin: '4px 0 0 0', padding: 0, listStyle: 'none' }}>
                       {entry.bullets.map((b, k) => (
-                        <li key={k} className="flex gap-1.5 text-[10px] text-gray-800 leading-snug">
-                          <span className="flex-shrink-0 mt-px">•</span>
+                        <li key={k} style={{ display: 'flex', gap: '8px', fontSize: '12px', color: '#222', lineHeight: '1.45', marginTop: '2px' }}>
+                          <span style={{ flexShrink: 0 }}>•</span>
                           <span>{b}</span>
                         </li>
                       ))}
@@ -189,7 +205,6 @@ function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
                 </div>
               ))}
 
-            {/* Content-only sections (Skills, Honors, etc.) */}
             {hasContent && !hasEntries && <SectionContentRenderer content={section.content} />}
           </div>
         )
@@ -261,48 +276,56 @@ function PlainTextFallback({ text }: { text: string }) {
   const bodyBlocks = blocks.filter((b) => b.type !== 'header')
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-8" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
+    <div
+      className="bg-white rounded-xl shadow-lg"
+      style={{
+        fontFamily: "'Times New Roman', Times, serif",
+        padding: '40px 48px',
+        maxWidth: '780px',
+        margin: '0 auto',
+      }}
+    >
       {nameBlock && (
-        <div className="text-center mb-4 pb-3 border-b-[1.5px] border-gray-800">
-          <h1 className="text-[17px] font-bold text-gray-900 uppercase" style={{ letterSpacing: '0.08em' }}>
+        <div className="text-center pb-3 mb-4" style={{ borderBottom: '1.5px solid #1a1a1a' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 'bold', color: '#111', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
             {nameBlock.text}
           </h1>
           {contactBlocks.length > 0 && (
-            <p className="text-[10px] text-gray-600 mt-1.5">
+            <p style={{ fontSize: '12px', color: '#444', marginTop: '6px' }}>
               {contactBlocks.map((b) => b.text).join(' | ')}
             </p>
           )}
         </div>
       )}
-      <div className="space-y-0.5">
+      <div>
         {bodyBlocks.map((b, i) => {
           if (b.type === 'section')
             return (
-              <div key={i} className="border-b border-gray-800 mt-3 mb-1">
-                <h2 className="text-[11px] font-bold text-gray-900 tracking-[0.1em] uppercase pb-0.5">
+              <div key={i} style={{ borderBottom: '1px solid #1a1a1a', marginTop: '14px', marginBottom: '6px' }}>
+                <h2 style={{ fontSize: '13px', fontWeight: 'bold', color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 2px 0' }}>
                   {b.text}
                 </h2>
               </div>
             )
           if (b.type === 'orgdate')
             return (
-              <div key={i} className="flex justify-between items-baseline gap-2 mt-2">
-                <span className="font-bold text-gray-900 text-[10.5px]">{b.org}</span>
-                <span className="text-gray-600 text-[10px] whitespace-nowrap flex-shrink-0">{b.date}</span>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px', marginTop: '8px' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#111' }}>{b.org}</span>
+                <span style={{ fontSize: '12px', color: '#333', whiteSpace: 'nowrap', flexShrink: 0 }}>{b.date}</span>
               </div>
             )
           if (b.type === 'title')
-            return <p key={i} className="text-gray-700 text-[10.5px] italic">{b.text}</p>
+            return <p key={i} style={{ fontStyle: 'italic', fontSize: '12.5px', color: '#333', margin: '1px 0' }}>{b.text}</p>
           if (b.type === 'bullet')
             return (
-              <div key={i} className="flex gap-1.5 text-[10px] text-gray-800 leading-snug mt-0.5">
-                <span className="flex-shrink-0">•</span>
+              <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '12px', color: '#222', lineHeight: '1.45', marginTop: '2px' }}>
+                <span style={{ flexShrink: 0 }}>•</span>
                 <span>{b.text}</span>
               </div>
             )
           if (b.type === 'detail')
-            return <p key={i} className="text-[10px] text-gray-700 pl-3 mt-0.5">{b.text}</p>
-          return <p key={i} className="text-[10px] text-gray-800 leading-snug">{b.text}</p>
+            return <p key={i} style={{ fontSize: '12px', color: '#444', paddingLeft: '16px', margin: '2px 0' }}>{b.text}</p>
+          return <p key={i} style={{ fontSize: '12px', color: '#222', lineHeight: '1.45', margin: '2px 0' }}>{b.text}</p>
         })}
       </div>
     </div>
@@ -602,42 +625,43 @@ export function ResumeEditor({
         </div>
       </div>
 
-      {/* Two-column: original vs rewrite */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Original */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full bg-text-muted" />
-            <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">Original</h3>
-          </div>
-          <div className="p-5 bg-bg-surface/50 border border-white/[0.06] rounded-2xl min-h-[400px]">
-            <pre className="font-mono text-[10.5px] text-text-secondary whitespace-pre-wrap leading-relaxed">
-              {original.slice(0, 3000) || 'Original resume text not available.'}
-            </pre>
-          </div>
+      {/* Rewrite preview — full width */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
+          <h3 className="text-xs font-medium text-accent-primary uppercase tracking-wider">
+            ATS-Optimized · Formatted Preview
+          </h3>
         </div>
-
-        {/* Formatted rewrite */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
-            <h3 className="text-xs font-medium text-accent-primary uppercase tracking-wider">
-              ATS-Optimized · Formatted Preview
-            </h3>
-          </div>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={JSON.stringify(currentRewrite.header)}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-            >
-              <ResumePreview rewrite={currentRewrite} />
-            </motion.div>
-          </AnimatePresence>
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={JSON.stringify(currentRewrite.header)}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <ResumePreview rewrite={currentRewrite} />
+          </motion.div>
+        </AnimatePresence>
       </div>
+
+      {/* Original (collapsible / below) */}
+      <details className="group">
+        <summary className="flex items-center gap-2 cursor-pointer list-none mb-2">
+          <div className="w-2 h-2 rounded-full bg-text-muted" />
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
+            Original Resume
+          </h3>
+          <span className="text-[10px] text-text-muted ml-1 group-open:hidden">(click to expand)</span>
+          <span className="text-[10px] text-text-muted ml-1 hidden group-open:inline">(click to collapse)</span>
+        </summary>
+        <div className="p-5 bg-bg-surface/50 border border-white/[0.06] rounded-2xl mt-2">
+          <pre className="font-mono text-[11px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+            {original.slice(0, 3000) || 'Original resume text not available.'}
+          </pre>
+        </div>
+      </details>
 
       {/* AI Chat Panel */}
       <div>
