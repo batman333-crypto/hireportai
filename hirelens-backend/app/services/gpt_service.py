@@ -1,5 +1,6 @@
 """Google Gemini service for AI-powered resume optimization features."""
 import json
+import re
 from typing import Any, Dict, List, Optional
 
 from app.models.response_models import (
@@ -38,7 +39,7 @@ def _extract_json(text: str) -> str:
     import re as _re
     text = text.strip()
     # Strip ```json ... ``` or ``` ... ``` wrappers
-    fenced = _re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
+    fenced = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
     if fenced:
         return fenced.group(1).strip()
     # Find the outermost { ... } block
@@ -133,6 +134,88 @@ Be specific, direct, and constructive. Focus on actionable insights."""
         }
 
 
+def _extract_resume_entities(text: str) -> Dict[str, List[str]]:
+    """Pre-parse resume text to extract every job, school, cert, and project.
+
+    Returns dict with keys: jobs, schools, certs, projects — each a list of
+    human-readable strings like "Citi, Irving, TX (Sep 2022 – Present)".
+    """
+    DATE_RE = re.compile(
+        r'(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
+        r'Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|'
+        r'Dec(?:ember)?)\.?\s+\d{4}|(?:19|20)\d{2}',
+        re.IGNORECASE,
+    )
+    SECTION_RE = re.compile(
+        r'^(EDUCATION|EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|'
+        r'PROJECTS?|CERTIFICATIONS?|LICENSES?|CREDENTIALS?|LEADERSHIP|'
+        r'ACTIVITIES|AWARDS|HONORS|RESEARCH|VOLUNTEER)',
+        re.IGNORECASE,
+    )
+    CERT_KEYWORDS = re.compile(
+        r'\b(certified|certification|certificate|license|credential|aws|gcp|azure|'
+        r'pmp|cpa|cfa|cisa|cissp|comptia|coursera|udemy|google|microsoft|'
+        r'associate|professional|practitioner)\b',
+        re.IGNORECASE,
+    )
+
+    jobs: List[str] = []
+    schools: List[str] = []
+    certs: List[str] = []
+    projects: List[str] = []
+
+    current_section = ""
+    lines = text.split('\n')
+
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+
+        m = SECTION_RE.match(line)
+        if m:
+            current_section = m.group(1).upper()
+            continue
+
+        has_date = bool(DATE_RE.search(line))
+
+        sect = current_section
+        if 'EXPERIENCE' in sect or 'WORK' in sect or 'PROFESSIONAL' in sect:
+            if has_date:
+                jobs.append(line)
+        elif 'EDUCATION' in sect:
+            if has_date or re.search(r'\b(university|college|school|institute|bachelor|master|phd|b\.s|m\.s|b\.a|m\.a)\b', line, re.I):
+                schools.append(line)
+        elif 'CERT' in sect or 'LICENSE' in sect or 'CREDENTIAL' in sect:
+            if line and not SECTION_RE.match(line):
+                certs.append(line)
+        elif 'PROJECT' in sect:
+            if has_date or (not line.startswith('•') and not line.startswith('-') and len(line) > 10):
+                if not projects or projects[-1] != line:
+                    projects.append(line)
+        else:
+            # Outside explicit sections — still catch cert-looking lines
+            if CERT_KEYWORDS.search(line) and has_date:
+                certs.append(line)
+
+    # De-duplicate while preserving order
+    def dedup(lst: List[str]) -> List[str]:
+        seen: set = set()
+        out = []
+        for x in lst:
+            if x not in seen:
+                seen.add(x)
+                out.append(x)
+        return out
+
+    return {
+        "jobs": dedup(jobs),
+        "schools": dedup(schools),
+        "certs": dedup(certs),
+        "projects": dedup(projects),
+    }
+
+
 def generate_resume_rewrite(
     resume_data: Dict[str, Any],
     jd_requirements: Dict[str, Any],
@@ -154,6 +237,20 @@ def generate_resume_rewrite(
     required_skills = ", ".join(jd_requirements.get("required_skills", [])[:20])
     responsibilities = jd_requirements.get("responsibilities", [])[:10]
 
+    # Pre-extract every entity so we can inject a hard checklist into the prompt
+    entities = _extract_resume_entities(resume_text)
+
+    # Build the mandatory-inclusion checklist lines
+    def _checklist(items: List[str], label: str) -> str:
+        if not items:
+            return f"  {label}: (none detected — scan original resume below for any)"
+        return f"  {label}:\n" + "\n".join(f"    ☐ {item}" for item in items)
+
+    checklist_jobs = _checklist(entities["jobs"], "JOBS / ROLES")
+    checklist_schools = _checklist(entities["schools"], "EDUCATION / DEGREES")
+    checklist_certs = _checklist(entities["certs"], "CERTIFICATIONS / LICENSES")
+    checklist_projects = _checklist(entities["projects"], "PROJECTS")
+
     # Build gap analysis context for the AI
     missing_kw_str = ", ".join((missing_keywords or [])[:30])
     missing_sk_str = ", ".join((missing_skills or [])[:20])
@@ -161,6 +258,25 @@ def generate_resume_rewrite(
     resp_str = "\n".join(f"- {r}" for r in responsibilities) if responsibilities else "N/A"
 
     prompt = f"""You are an elite ATS optimization expert and professional resume writer. Your job is to rewrite this resume to fill a FULL PAGE and achieve the HIGHEST POSSIBLE ATS score for the target role.
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  MANDATORY INCLUSION CHECKLIST — EVERY ITEM BELOW MUST APPEAR       ║
+║  IN YOUR OUTPUT. IF ANY ARE MISSING, YOUR RESPONSE IS INVALID.      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+I have scanned the original resume and extracted the following entities.
+You MUST include ALL of them in the rewritten resume — do not drop a single one:
+
+{checklist_jobs}
+
+{checklist_schools}
+
+{checklist_certs}
+
+{checklist_projects}
+
+Before finalising your JSON, verify: does your output include every item above?
+If any job, school, cert, or project is missing — add it back before returning.
 
 ═══ ATS SCORING CRITERIA ═══
 
@@ -289,7 +405,7 @@ Bullets: •  action verb + task + metric + keyword (no period at end)
         fallback_text = ai_output if ai_output.strip() else resume_text
         # Strip any leftover JSON syntax so it reads as plain text
         import re as _re
-        fallback_text = _re.sub(r'^\s*\{.*?"full_text"\s*:\s*"', '', fallback_text, flags=_re.DOTALL)
+        fallback_text = re.sub(r'^\s*\{.*?"full_text"\s*:\s*"', '', fallback_text, flags=re.DOTALL)
         fallback_text = fallback_text.strip().strip('"').strip()
         if not fallback_text or len(fallback_text) < 50:
             fallback_text = resume_text
