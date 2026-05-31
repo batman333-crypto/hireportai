@@ -15,6 +15,7 @@ import { BulletAnalyzer } from '@/components/dashboard/BulletAnalyzer'
 import { FormattingIssues } from '@/components/dashboard/FormattingIssues'
 import { JobFitExplanation } from '@/components/dashboard/JobFitExplanation'
 import { ImprovementSuggestions } from '@/components/dashboard/ImprovementSuggestions'
+import ATSDiagnosis from '@/components/dashboard/ATSDiagnosis'
 import { AnimatedCard, containerVariants, cardVariants } from '@/components/ui/AnimatedCard'
 import { GlowButton } from '@/components/ui/GlowButton'
 import { SkeletonDashboard } from '@/components/ui/SkeletonLoader'
@@ -46,6 +47,7 @@ const NAV_ITEMS = [
   { id: 'skills', label: 'Skills Radar', icon: GitMerge },
   { id: 'job-fit', label: 'Job Fit', icon: MessageSquare },
   { id: 'bullets', label: 'Bullets', icon: Zap },
+  { id: 'diagnosis', label: 'ATS Diagnosis', icon: AlertTriangle },
 ]
 
 export default function Results() {
@@ -247,7 +249,7 @@ export default function Results() {
 
           {/* ── RIGHT PANEL ───────────────────────────────────────────── */}
           {/* Shown inline below main on lg, pinned to right column on xl */}
-          <div className="xl:sticky xl:top-20 space-y-4 lg:col-span-2 xl:col-span-1 z-10">
+          <div className="space-y-4 lg:col-span-2 xl:col-span-1 z-10">
 
             {/* Missing skills */}
             <PanelSection title="Missing Skills" icon={TrendingUp}>
@@ -266,6 +268,14 @@ export default function Results() {
                 skillGaps={result.skill_gaps}
               />
             </PanelSection>
+
+            {/* Deep ATS Diagnosis */}
+            <div id="diagnosis">
+              <ATSDiagnosis
+                resumeText={result.resume_text || ''}
+                jobDescription={state.jobDescription || ''}
+              />
+            </div>
 
           </div>
         </motion.div>

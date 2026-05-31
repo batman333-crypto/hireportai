@@ -11,6 +11,12 @@ from app.models.response_models import (
     RewriteResponse,
     RewriteSection,
 )
+from app.schemas.responses import (
+    ATSKiller,
+    DiagnosisResponse,
+    SectionDiagnosis,
+    TopFix,
+)
 
 
 def _get_client():
@@ -340,6 +346,154 @@ def _parse_plain_text_to_sections(text: str) -> List[RewriteSection]:
         ))
 
     return sections if sections else [RewriteSection(title="RESUME", content=text, entries=[])]
+
+
+def generate_ats_diagnosis(
+    resume_text: str,
+    job_description: str,
+    target_role: str = "",
+    industry: str = "",
+    seniority: str = "entry",
+) -> DiagnosisResponse:
+    """Run a brutal 4-area ATS diagnostic on the resume.
+
+    Mirrors what enterprise ATS systems (Workday, Taleo, iCIMS, Greenhouse)
+    actually penalise: formatting killers, weak bullets, missing signals, ranked fixes.
+    """
+    role_label = target_role or "the target role"
+    industry_label = industry or "the relevant industry"
+    seniority_label = seniority or "entry-level"
+
+    prompt = f"""You are a senior ATS evaluator and resume diagnostics expert who has reviewed 10,000+ resumes for {role_label} positions across companies of every size. You think and reason like Workday, Taleo, iCIMS, and Greenhouse combined.
+
+Your job: diagnose this resume with zero softening. Be brutally specific. Quote the candidate's ACTUAL lines back. If something is broken, say exactly what line is broken and why.
+
+═══ RESUME ═══
+{resume_text[:4000]}
+
+═══ JOB DESCRIPTION ═══
+{job_description[:2000]}
+
+═══ CONTEXT ═══
+Target Role: {role_label}
+Industry: {industry_label}
+Seniority: {seniority_label}
+
+═══ YOUR DIAGNOSIS — FOUR AREAS ═══
+
+AREA 1 — ATS-KILLERS
+Formatting, parsing, or layout issues that cause auto-rejection or score burial:
+- Tables, multi-column layouts, text boxes, headers/footers, graphics
+- Non-standard fonts, special characters that break parsing
+- Missing or ambiguous dates (ATS needs MM/YYYY or Month YYYY)
+- File-type risks, missing section labels ATS expects
+- Anything an ATS parser cannot extract cleanly
+
+AREA 2 — SECTION-BY-SECTION DIAGNOSIS
+For EACH section present (Summary, Experience, Skills, Education, Projects, Leadership):
+- Quote the weakest bullet or sentence EXACTLY as written
+- Explain precisely why it fails: no metrics, no keywords, weak verb, too vague, redundant, etc.
+- Provide a single specific fix
+
+AREA 3 — MISSING SIGNALS
+What hiring managers and ATS systems for {role_label} expect to see that is ABSENT:
+- Missing keywords/skills that appear in 80%+ of {role_label} job postings
+- Missing quantification patterns (%, $, time saved, users impacted)
+- Missing credentials, tools, methodologies for this role/seniority
+
+AREA 4 — TOP 5 FIXES RANKED BY IMPACT
+Rank by ATS score impact. For fix #1, provide a full before/after bullet rewrite using Google's XYZ formula:
+"Accomplished [X] as measured by [Y], by doing [Z]"
+For fixes #2-5, explain exactly what to change.
+
+═══ JSON OUTPUT ═══
+
+Return ONLY this JSON (no markdown, no preamble):
+{{
+  "ats_killers": [
+    {{
+      "issue": "exact issue name",
+      "impact": "specific consequence on ATS scoring or parsing",
+      "fix": "exact action to fix it"
+    }}
+  ],
+  "section_diagnosis": [
+    {{
+      "section": "SECTION NAME",
+      "weakest_item": "exact quoted line from the resume",
+      "reason": "specific technical reason this fails ATS or recruiter scan",
+      "fix": "exact rewrite or action"
+    }}
+  ],
+  "missing_signals": [
+    "specific keyword, metric pattern, or credential that is absent"
+  ],
+  "top_fixes": [
+    {{
+      "rank": 1,
+      "title": "short action title",
+      "impact": "HIGH",
+      "before": "exact original line",
+      "after": "XYZ-formula rewrite with action verb + metric + method",
+      "why": "why this rewrite beats ATS scoring"
+    }}
+  ],
+  "overall_verdict": "2-sentence brutal verdict: current ATS pass probability and #1 reason this resume gets buried"
+}}"""
+
+    try:
+        raw = _generate(prompt, temperature=0.3, max_tokens=4000, json_mode=True)
+        data = json.loads(raw)
+
+        ats_killers = [
+            ATSKiller(
+                issue=k.get("issue", ""),
+                impact=k.get("impact", ""),
+                fix=k.get("fix", ""),
+            )
+            for k in data.get("ats_killers", [])
+        ]
+
+        section_diagnosis = [
+            SectionDiagnosis(
+                section=s.get("section", ""),
+                weakest_item=s.get("weakest_item", ""),
+                reason=s.get("reason", ""),
+                fix=s.get("fix", ""),
+            )
+            for s in data.get("section_diagnosis", [])
+        ]
+
+        top_fixes = [
+            TopFix(
+                rank=f.get("rank", i + 1),
+                title=f.get("title", ""),
+                impact=f.get("impact", "MEDIUM"),
+                before=f.get("before", ""),
+                after=f.get("after", ""),
+                why=f.get("why", ""),
+            )
+            for i, f in enumerate(data.get("top_fixes", []))
+        ]
+
+        return DiagnosisResponse(
+            ats_killers=ats_killers,
+            section_diagnosis=section_diagnosis,
+            missing_signals=data.get("missing_signals", []),
+            top_fixes=top_fixes,
+            target_role=role_label,
+            overall_verdict=data.get("overall_verdict", ""),
+        )
+
+    except Exception:
+        return DiagnosisResponse(
+            ats_killers=[],
+            section_diagnosis=[],
+            missing_signals=[],
+            top_fixes=[],
+            target_role=role_label,
+            overall_verdict="Diagnosis failed — please try again.",
+        )
 
 
 def generate_cover_letter(

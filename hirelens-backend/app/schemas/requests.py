@@ -50,6 +50,16 @@ class ResumeChatRequest(BaseModel):
     job_description: str = Field(default="", description="Original job description for context")
 
 
+class DiagnosisRequest(BaseModel):
+    """Request body for ATS diagnosis endpoint."""
+
+    resume_text: str = Field(..., min_length=50, description="Plain text of the resume")
+    job_description: str = Field(..., min_length=50, description="Job description text")
+    target_role: str = Field(default="", description="Target role title e.g. 'Product Manager'")
+    industry: str = Field(default="", description="Industry e.g. 'Tech', 'Finance'")
+    seniority: str = Field(default="entry", description="junior / mid / senior / lead")
+
+
 class TrackerApplicationCreate(BaseModel):
     """Request body for creating a tracker application."""
 

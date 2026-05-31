@@ -118,6 +118,47 @@ export interface AnalysisState {
   jobDescription: string
 }
 
+// ── ATS Diagnosis types ──────────────────────────────────────────────────────
+
+export interface ATSKiller {
+  issue: string
+  impact: string
+  fix: string
+}
+
+export interface SectionDiagnosis {
+  section: string
+  weakest_item: string
+  reason: string
+  fix: string
+}
+
+export interface TopFix {
+  rank: number
+  title: string
+  impact: 'HIGH' | 'MEDIUM' | 'LOW'
+  before: string
+  after: string
+  why: string
+}
+
+export interface DiagnosisResponse {
+  ats_killers: ATSKiller[]
+  section_diagnosis: SectionDiagnosis[]
+  missing_signals: string[]
+  top_fixes: TopFix[]
+  target_role: string
+  overall_verdict: string
+}
+
+export interface DiagnosisRequest {
+  resume_text: string
+  job_description: string
+  target_role?: string
+  industry?: string
+  seniority?: string
+}
+
 export type AnalysisAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }

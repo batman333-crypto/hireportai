@@ -39,6 +39,43 @@ class FormattingIssue(BaseModel):
     fix: str
 
 
+# ── ATS Diagnosis models ──────────────────────────────────────────────────────
+
+class ATSKiller(BaseModel):
+    """A formatting or parsing issue that causes ATS auto-rejection."""
+    issue: str
+    impact: str
+    fix: str
+
+
+class SectionDiagnosis(BaseModel):
+    """Diagnosis of a single resume section."""
+    section: str
+    weakest_item: str
+    reason: str
+    fix: str
+
+
+class TopFix(BaseModel):
+    """A ranked fix with before/after example."""
+    rank: int
+    title: str
+    impact: str          # HIGH / MEDIUM / LOW
+    before: str
+    after: str
+    why: str
+
+
+class DiagnosisResponse(BaseModel):
+    """Full ATS diagnostic report — 4 areas of analysis."""
+    ats_killers: List[ATSKiller]
+    section_diagnosis: List[SectionDiagnosis]
+    missing_signals: List[str]
+    top_fixes: List[TopFix]
+    target_role: str = ""
+    overall_verdict: str = ""
+
+
 class KeywordChartData(BaseModel):
     """Data point for the keyword frequency chart."""
 

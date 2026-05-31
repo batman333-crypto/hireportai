@@ -3,6 +3,8 @@ import toast from 'react-hot-toast'
 import type {
   AnalysisResponse,
   CoverLetterResponse,
+  DiagnosisRequest,
+  DiagnosisResponse,
   InterviewPrepResponse,
   RewriteResponse,
   TrackerApplication,
@@ -126,6 +128,15 @@ export async function chatEditResume(
     current_resume: currentResume,
     message,
     job_description: jobDescription,
+  })
+  return response.data
+}
+
+export async function diagnoseResume(
+  req: DiagnosisRequest
+): Promise<DiagnosisResponse> {
+  const response = await api.post<DiagnosisResponse>('/api/diagnose', req, {
+    timeout: 180000, // 3 min — diagnosis is thorough
   })
   return response.data
 }

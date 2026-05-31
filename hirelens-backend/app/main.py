@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import analyze, cover_letter, interview, rewrite, tracker
+from app.api.routes import analyze, cover_letter, diagnose, interview, rewrite, tracker
 from app.api.v1.routes import (
     analyze as v1_analyze,
     auth as v1_auth,
@@ -101,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(cover_letter.router, prefix="/api", tags=["Cover Letter"])
     app.include_router(interview.router, prefix="/api", tags=["Interview Prep"])
     app.include_router(tracker.router, prefix="/api", tags=["Tracker"])
+    app.include_router(diagnose.router, prefix="/api", tags=["Diagnosis"])
 
     # v1 routers — /api/v1/*
     app.include_router(v1_auth.router, prefix="/api/v1", tags=["v1 Auth"])
