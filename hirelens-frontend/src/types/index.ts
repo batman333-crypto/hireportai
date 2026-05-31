@@ -91,10 +91,51 @@ export interface CoverLetterResponse {
 export interface InterviewQuestion {
   question: string
   star_framework: string
+  category?: 'behavioral' | 'technical' | 'role-specific'
 }
 
 export interface InterviewPrepResponse {
   questions: InterviewQuestion[]
+}
+
+// ─── Recruiter Roast / Red Team ───
+export interface RedFlag {
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  category: string
+  finding: string
+  recruiter_quote: string
+  fix_suggestion: string
+}
+
+export interface SeniorityProfile {
+  tier: 'student' | 'ic' | 'manager' | 'director' | 'executive'
+  yoe: number
+  weights: Record<string, number>
+  guidance: string
+  signals?: Record<string, boolean>
+}
+
+export interface RedTeamResponse {
+  reject_probability: number
+  verdict: 'PASS' | 'BORDERLINE' | 'REJECT'
+  cynical_summary: string
+  red_flags: RedFlag[]
+  top_3_fixes_to_unblock: string[]
+  seniority: SeniorityProfile
+}
+
+// ─── LinkedIn Audit ───
+export interface LinkedInAuditResponse {
+  score: number
+  verdict: string
+  buzzword_count: number
+  buzzwords_found: string[]
+  has_quantification: boolean
+  word_count: number
+  top_issues: string[]
+  top_strengths: string[]
+  rewritten_first_sentence: string
+  shareable_summary: string
 }
 
 export type ApplicationStatus = 'Applied' | 'Interview' | 'Offer' | 'Rejected'

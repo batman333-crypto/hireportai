@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Copy, Check, FileText, Download, FileDown } from 'lucide-react'
-import type { RewriteResponse } from '@/types'
+import { Copy, Check, FileText, Download, FileDown, Pencil, Eye } from 'lucide-react'
+import type { RewriteResponse, RewriteSection, RewriteEntry } from '@/types'
 
 interface ResumeEditorProps {
   original: string
@@ -10,56 +10,232 @@ interface ResumeEditorProps {
   onDownloadPDF?: () => void
   onDownloadDocx?: () => void
   isExportingPDF?: boolean
+  onUpdate?: (updated: RewriteResponse) => void
 }
 
-/** Full formatted resume preview */
-function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
+/** Inline editable text span — blurs on Enter, calls onChange with new value */
+function EditableText({
+  value,
+  onChange,
+  className,
+  tag: Tag = 'span',
+  editing,
+}: {
+  value: string
+  onChange: (v: string) => void
+  className?: string
+  tag?: 'span' | 'p' | 'h1' | 'h2' | 'li'
+  editing: boolean
+}) {
+  const ref = useRef<HTMLElement>(null)
+
+  const handleBlur = () => {
+    const text = ref.current?.innerText ?? ''
+    if (text !== value) onChange(text)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      ref.current?.blur()
+    }
+  }
+
   return (
-    <div className="p-8 bg-white rounded-2xl shadow-card min-h-[400px]" style={{ fontFamily: 'Times New Roman, serif' }}>
+    <Tag
+      ref={ref as any}
+      contentEditable={editing}
+      suppressContentEditableWarning
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      className={`${className ?? ''} ${editing ? 'outline-none focus:ring-1 focus:ring-blue-400/40 rounded px-0.5 -mx-0.5 hover:bg-blue-50/60 cursor-text' : ''}`}
+      style={editing ? { minWidth: '2ch' } : undefined}
+    >
+      {value}
+    </Tag>
+  )
+}
+
+/** Full formatted resume preview — optionally editable */
+function ResumePreview({
+  rewrite,
+  editing,
+  onUpdate,
+}: {
+  rewrite: RewriteResponse
+  editing: boolean
+  onUpdate: (r: RewriteResponse) => void
+}) {
+  const updateHeader = useCallback(
+    (field: 'name' | 'contact', value: string) => {
+      onUpdate({
+        ...rewrite,
+        header: { ...rewrite.header, [field]: value },
+      })
+    },
+    [rewrite, onUpdate],
+  )
+
+  const updateSection = useCallback(
+    (si: number, patch: Partial<RewriteSection>) => {
+      const sections = rewrite.sections.map((s, i) => (i === si ? { ...s, ...patch } : s))
+      onUpdate({ ...rewrite, sections })
+    },
+    [rewrite, onUpdate],
+  )
+
+  const updateEntry = useCallback(
+    (si: number, ei: number, patch: Partial<RewriteEntry>) => {
+      const sections = rewrite.sections.map((s, i) => {
+        if (i !== si) return s
+        const entries = s.entries.map((e, j) => (j === ei ? { ...e, ...patch } : e))
+        return { ...s, entries }
+      })
+      onUpdate({ ...rewrite, sections })
+    },
+    [rewrite, onUpdate],
+  )
+
+  const updateBullet = useCallback(
+    (si: number, ei: number, bi: number, value: string) => {
+      const sections = rewrite.sections.map((s, i) => {
+        if (i !== si) return s
+        const entries = s.entries.map((e, j) => {
+          if (j !== ei) return e
+          const bullets = e.bullets.map((b, k) => (k === bi ? value : b))
+          return { ...e, bullets }
+        })
+        return { ...s, entries }
+      })
+      onUpdate({ ...rewrite, sections })
+    },
+    [rewrite, onUpdate],
+  )
+
+  const updateDetail = useCallback(
+    (si: number, ei: number, di: number, value: string) => {
+      const sections = rewrite.sections.map((s, i) => {
+        if (i !== si) return s
+        const entries = s.entries.map((e, j) => {
+          if (j !== ei) return e
+          const details = e.details.map((d, k) => (k === di ? value : d))
+          return { ...e, details }
+        })
+        return { ...s, entries }
+      })
+      onUpdate({ ...rewrite, sections })
+    },
+    [rewrite, onUpdate],
+  )
+
+  return (
+    <div
+      className={`p-8 bg-white rounded-2xl shadow-card min-h-[400px] ${editing ? 'ring-2 ring-blue-400/30' : ''}`}
+      style={{ fontFamily: 'Times New Roman, serif' }}
+    >
       {/* Header */}
       {rewrite.header?.name && (
         <div className="text-center mb-5 pb-3 border-b-2 border-gray-800">
-          <h1 className="text-[20px] font-bold text-gray-900 tracking-wide uppercase">
-            {rewrite.header.name}
-          </h1>
+          <EditableText
+            tag="h1"
+            value={rewrite.header.name}
+            onChange={(v) => updateHeader('name', v)}
+            className="text-[20px] font-bold text-gray-900 tracking-wide uppercase"
+            editing={editing}
+          />
           {rewrite.header.contact && (
-            <p className="text-[11px] text-gray-600 mt-1.5 tracking-wide">{rewrite.header.contact}</p>
+            <EditableText
+              tag="p"
+              value={rewrite.header.contact}
+              onChange={(v) => updateHeader('contact', v)}
+              className="text-[11px] text-gray-600 mt-1.5 tracking-wide"
+              editing={editing}
+            />
           )}
         </div>
       )}
 
-      {/* Sections */}
-      {rewrite.sections.map((section, i) => (
-        <div key={i} style={{ marginTop: i === 0 ? 0 : '14px' }}>
+      {/* Sections — dedupe by normalized title and skip empty sections.
+          We keep the ORIGINAL index so edits write back to the right place. */}
+      {(() => {
+        const seen = new Set<string>()
+        return rewrite.sections
+          .map((s, originalIdx) => ({ s, originalIdx }))
+          .filter(({ s }) => {
+            const key = (s.title || '').trim().toLowerCase().replace(/\s+/g, ' ')
+            if (!key) return false
+            const hasEntries = s.entries?.some(
+              (e) => e.org || e.title || (e.bullets && e.bullets.length > 0)
+            )
+            const hasContent = s.content && s.content.trim().length > 0
+            if (!hasEntries && !hasContent) return false
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+      })().map(({ s: section, originalIdx: si }, displayIdx) => (
+        <div key={si} style={{ marginTop: displayIdx === 0 ? 0 : '14px' }}>
           {/* Section heading */}
-          <h2 className="text-[12px] font-bold text-gray-900 tracking-[0.15em] uppercase border-b border-gray-800 pb-1 mb-3">
-            {section.title}
-          </h2>
+          <EditableText
+            tag="h2"
+            value={section.title}
+            onChange={(v) => updateSection(si, { title: v })}
+            className="text-[12px] font-bold text-gray-900 tracking-[0.15em] uppercase border-b border-gray-800 pb-1 mb-3"
+            editing={editing}
+          />
 
           {/* Entries */}
           {section.entries?.length > 0 &&
-            section.entries.map((entry, j) => (
-              <div key={j} className="mb-4">
+            section.entries.map((entry, ei) => (
+              <div key={ei} className="mb-4">
                 {entry.org && (
                   <div className="flex justify-between items-baseline gap-4">
-                    <span className="font-bold text-gray-900 text-[11px]">{entry.org}</span>
+                    <EditableText
+                      value={entry.org}
+                      onChange={(v) => updateEntry(si, ei, { org: v })}
+                      className="font-bold text-gray-900 text-[11px]"
+                      editing={editing}
+                    />
                     {entry.date && (
-                      <span className="text-gray-600 text-[10.5px] whitespace-nowrap">{entry.date}</span>
+                      <EditableText
+                        value={entry.date}
+                        onChange={(v) => updateEntry(si, ei, { date: v })}
+                        className="text-gray-600 text-[10.5px] whitespace-nowrap"
+                        editing={editing}
+                      />
                     )}
                   </div>
                 )}
                 {entry.title && (
-                  <p className="text-gray-700 text-[11px] italic mt-0.5">{entry.title}</p>
+                  <EditableText
+                    tag="p"
+                    value={entry.title}
+                    onChange={(v) => updateEntry(si, ei, { title: v })}
+                    className="text-gray-700 text-[11px] italic mt-0.5"
+                    editing={editing}
+                  />
                 )}
-                {entry.details?.map((d, k) => (
-                  <p key={k} className="text-gray-600 text-[10.5px] mt-0.5">{d}</p>
+                {entry.details?.map((d, di) => (
+                  <EditableText
+                    key={di}
+                    tag="p"
+                    value={d}
+                    onChange={(v) => updateDetail(si, ei, di, v)}
+                    className="text-gray-600 text-[10.5px] mt-0.5"
+                    editing={editing}
+                  />
                 ))}
                 {entry.bullets?.length > 0 && (
                   <ul className="mt-1.5 space-y-1">
-                    {entry.bullets.map((b, k) => (
-                      <li key={k} className="flex gap-2 text-[10.5px] text-gray-700 leading-relaxed">
+                    {entry.bullets.map((b, bi) => (
+                      <li key={bi} className="flex gap-2 text-[10.5px] text-gray-700 leading-relaxed">
                         <span className="flex-shrink-0 mt-0.5">•</span>
-                        <span>{b}</span>
+                        <EditableText
+                          value={b}
+                          onChange={(v) => updateBullet(si, ei, bi, v)}
+                          className="flex-1"
+                          editing={editing}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -67,11 +243,18 @@ function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
               </div>
             ))}
 
-          {/* Content fallback */}
+          {/* Content fallback (Skills, Honors) */}
           {section.content && (!section.entries || section.entries.length === 0) && (
-            <p className="text-[10.5px] text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {section.content}
-            </p>
+            editing ? (
+              <EditableContent
+                value={section.content}
+                onChange={(v) => updateSection(si, { content: v })}
+              />
+            ) : (
+              <p className="text-[10.5px] text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {section.content}
+              </p>
+            )
           )}
         </div>
       ))}
@@ -79,8 +262,29 @@ function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
   )
 }
 
-export function ResumeEditor({ original, rewrite, isLoading, onDownloadPDF, onDownloadDocx, isExportingPDF }: ResumeEditorProps) {
+/** Multi-line editable content block for skills/content sections */
+function EditableContent({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const handleBlur = () => {
+    const text = ref.current?.innerText ?? ''
+    if (text !== value) onChange(text)
+  }
+  return (
+    <div
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      onBlur={handleBlur}
+      className="text-[10.5px] text-gray-700 leading-relaxed whitespace-pre-wrap outline-none focus:ring-1 focus:ring-blue-400/40 rounded px-0.5 -mx-0.5 hover:bg-blue-50/60 cursor-text"
+    >
+      {value}
+    </div>
+  )
+}
+
+export function ResumeEditor({ original, rewrite, isLoading, onDownloadPDF, onDownloadDocx, isExportingPDF, onUpdate }: ResumeEditorProps) {
   const [copiedFull, setCopiedFull] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   const handleCopyFull = async () => {
     if (!rewrite) return
@@ -88,6 +292,13 @@ export function ResumeEditor({ original, rewrite, isLoading, onDownloadPDF, onDo
     setCopiedFull(true)
     setTimeout(() => setCopiedFull(false), 2000)
   }
+
+  const handleUpdate = useCallback(
+    (updated: RewriteResponse) => {
+      onUpdate?.(updated)
+    },
+    [onUpdate],
+  )
 
   if (isLoading) {
     return (
@@ -138,6 +349,18 @@ export function ResumeEditor({ original, rewrite, isLoading, onDownloadPDF, onDo
           </span>
         </div>
         <div className="flex items-center gap-1">
+          {/* Edit / Preview toggle */}
+          <button
+            onClick={() => setEditing((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              editing
+                ? 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25'
+                : 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary/5'
+            }`}
+          >
+            {editing ? <Eye size={12} /> : <Pencil size={12} />}
+            {editing ? 'Preview' : 'Edit'}
+          </button>
           <button
             onClick={handleCopyFull}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:text-accent-primary hover:bg-accent-primary/5 transition-colors"
@@ -167,6 +390,19 @@ export function ResumeEditor({ original, rewrite, isLoading, onDownloadPDF, onDo
         </div>
       </div>
 
+      {/* Edit mode hint */}
+      {editing && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="mb-4 px-4 py-2.5 rounded-xl bg-blue-500/8 border border-blue-400/15 text-xs text-blue-300 flex items-center gap-2"
+        >
+          <Pencil size={11} />
+          Click any text on the resume to edit. Changes auto-save and will be included in PDF/DOCX downloads.
+        </motion.div>
+      )}
+
       {/* Two column: original vs formatted rewrite */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Original */}
@@ -195,7 +431,7 @@ export function ResumeEditor({ original, rewrite, isLoading, onDownloadPDF, onDo
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <ResumePreview rewrite={rewrite} />
+            <ResumePreview rewrite={rewrite} editing={editing} onUpdate={handleUpdate} />
           </motion.div>
         </div>
       </div>

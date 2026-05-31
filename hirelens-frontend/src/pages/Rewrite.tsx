@@ -71,8 +71,29 @@ export default function Rewrite() {
   const { canUsePremium } = useUsage()
   const [activeTab, setActiveTab] = useState<TabId>('resume')
   const [isExportingPDF, setIsExportingPDF] = useState(false)
+  const [templateType, setTemplateType] = useState<string>('auto')
+
+  const ROLE_TEMPLATES: { id: string; label: string }[] = [
+    { id: 'auto', label: 'Auto-detect from JD' },
+    { id: 'executive', label: 'Executive / Board (C-suite, VP+)' },
+    { id: 'consulting', label: 'Consulting (Strategy / Advisory)' },
+    { id: 'business', label: 'Business (Finance / Marketing / Mgmt)' },
+    { id: 'technical', label: 'Technical (CS / Software / Data)' },
+    { id: 'engineering', label: 'Engineering (Mech / EE / Civil / Chem)' },
+    { id: 'healthcare', label: 'Healthcare / Pre-Health' },
+    { id: 'research', label: 'Research / Industry R&D' },
+    { id: 'academic', label: 'Academic CV (Tenure / Postdoc)' },
+    { id: 'education', label: 'Education (Teaching / Curriculum)' },
+    { id: 'communications', label: 'Communications / Media / PR' },
+    { id: 'trade', label: 'Trade & Vocational (Electrician, HVAC, CDL…)' },
+    { id: 'international', label: 'International CV (EU / APAC, A4)' },
+    { id: 'federal', label: 'Federal / Government (USAJobs)' },
+    { id: 'returnship', label: 'Returnship / Career Re-entry' },
+    { id: 'general', label: 'General' },
+  ]
   const {
     rewriteResult,
+    setRewriteResult,
     coverLetter,
     isLoadingRewrite,
     isLoadingCoverLetter,
@@ -171,12 +192,19 @@ export default function Rewrite() {
         return h
       }
 
-      // ── Find optimal scale: start at 1.0, shrink until it fits ──
-      let scale = 1.0
-      const minScale = 0.55 // don't go below ~55% — keeps text readable
-      while (measureHeight(scale) > availableH && scale > minScale) {
-        scale -= 0.02
+      // ── Find optimal scale: binary search so content fills the full page ──
+      // Allow scaling UP (to fill empty space) and DOWN (to fit overflow).
+      const minScale = 0.48
+      const maxScale = 1.6
+      let lo = minScale
+      let hi = maxScale
+      for (let i = 0; i < 28; i++) {
+        const mid = (lo + hi) / 2
+        if (measureHeight(mid) > availableH) hi = mid
+        else lo = mid
       }
+      // `lo` is the largest scale that still fits. Use ~99% of it for safety margin.
+      let scale = Math.max(minScale, Math.min(maxScale, lo * 0.995))
 
       // ── Scaled helpers ──
       const sz = (base: number) => base * scale
@@ -373,14 +401,34 @@ export default function Rewrite() {
           {canUsePremium && (
             <div className="flex items-center gap-3">
               {activeTab === 'resume' && !rewriteResult && (
-                <GlowButton
-                  size="sm"
-                  onClick={() => runRewrite(resumeText, jobDescription)}
-                  isLoading={isLoadingRewrite}
-                >
-                  <PenTool size={13} />
-                  Generate AI Rewrite
-                </GlowButton>
+                <>
+                  <select
+                    value={templateType}
+                    onChange={(e) => setTemplateType(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-text-primary text-xs font-medium hover:border-white/[0.16] focus:outline-none focus:border-accent-primary transition-all"
+                    aria-label="Resume role template"
+                  >
+                    {ROLE_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-bg-base">
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                  <GlowButton
+                    size="sm"
+                    onClick={() =>
+                      runRewrite(
+                        resumeText,
+                        jobDescription,
+                        templateType === 'auto' ? undefined : templateType
+                      )
+                    }
+                    isLoading={isLoadingRewrite}
+                  >
+                    <PenTool size={13} />
+                    Generate AI Rewrite
+                  </GlowButton>
+                </>
               )}
               {activeTab === 'resume' && rewriteResult && (
                 <>
@@ -451,6 +499,7 @@ export default function Rewrite() {
                   onDownloadPDF={handleDownloadPDF}
                   onDownloadDocx={handleDownloadDocx}
                   isExportingPDF={isExportingPDF}
+                  onUpdate={setRewriteResult}
                 />
               ) : (
                 <CoverLetterViewer

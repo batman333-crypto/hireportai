@@ -4,6 +4,8 @@ import type {
   AnalysisResponse,
   CoverLetterResponse,
   InterviewPrepResponse,
+  LinkedInAuditResponse,
+  RedTeamResponse,
   RewriteResponse,
   TrackerApplication,
 } from '@/types'
@@ -115,6 +117,26 @@ export async function updateApplication(
 
 export async function deleteApplication(id: string): Promise<void> {
   await api.delete(`/api/tracker/${id}`)
+}
+
+// ─── Recruiter Roast (Red Team) ───
+export async function runRedTeam(
+  resumeText: string,
+  jdText: string
+): Promise<RedTeamResponse> {
+  const response = await api.post<RedTeamResponse>('/api/red-team', {
+    resume_text: resumeText,
+    job_description: jdText,
+  })
+  return response.data
+}
+
+// ─── LinkedIn About Audit (public, no auth) ───
+export async function runLinkedInAudit(aboutText: string): Promise<LinkedInAuditResponse> {
+  const response = await api.post<LinkedInAuditResponse>('/api/linkedin-audit', {
+    about_text: aboutText,
+  })
+  return response.data
 }
 
 export default api

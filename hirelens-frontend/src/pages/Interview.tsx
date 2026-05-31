@@ -27,22 +27,27 @@ const CATEGORY_COLORS: Record<CategoryFilter, string> = {
   'role-specific': 'text-warning',
 }
 
-function detectCategory(question: string): CategoryFilter {
-  const q = question.toLowerCase()
-  if (q.includes('tell me about') || q.includes('describe a time') || q.includes('how do you handle') || q.includes('give an example')) return 'behavioral'
-  if (q.includes('implement') || q.includes('algorithm') || q.includes('data structure') || q.includes('complexity') || q.includes('design') || q.includes('code') || q.includes('technical') || q.includes('difference between') || q.includes('explain how') || q.includes('what is')) return 'technical'
+/** Resolve a question's category. Prefer the backend-provided value; fall back to heuristics. */
+function resolveCategory(q: { question: string; category?: string }): Exclude<CategoryFilter, 'all'> {
+  const provided = (q.category || '').toLowerCase().trim()
+  if (provided === 'behavioral' || provided === 'technical' || provided === 'role-specific') {
+    return provided
+  }
+  const t = q.question.toLowerCase()
+  if (t.includes('tell me about') || t.includes('describe a time') || t.includes('how do you handle') || t.includes('give an example')) return 'behavioral'
+  if (t.includes('implement') || t.includes('algorithm') || t.includes('data structure') || t.includes('complexity') || t.includes('design') || t.includes('code') || t.includes('technical') || t.includes('difference between') || t.includes('explain how') || t.includes('what is')) return 'technical'
   return 'role-specific'
 }
 
 interface QuestionCardProps {
   question: string
   starFramework: string
+  category: Exclude<CategoryFilter, 'all'>
   index: number
 }
 
-function QuestionCard({ question, starFramework, index }: QuestionCardProps) {
+function QuestionCard({ question, starFramework, category, index }: QuestionCardProps) {
   const [expanded, setExpanded] = useState(false)
-  const category = detectCategory(question)
   const CategoryIcon = CATEGORY_ICONS[category]
 
   return (
@@ -142,7 +147,7 @@ export default function Interview() {
   const allQuestions = interviewResult?.questions ?? []
   const filteredQuestions = activeFilter === 'all'
     ? allQuestions
-    : allQuestions.filter(q => detectCategory(q.question) === activeFilter)
+    : allQuestions.filter(q => resolveCategory(q) === activeFilter)
 
   const filters: CategoryFilter[] = ['all', 'behavioral', 'technical', 'role-specific']
 
@@ -306,6 +311,7 @@ export default function Interview() {
                     key={i}
                     question={q.question}
                     starFramework={q.star_framework}
+                    category={resolveCategory(q)}
                     index={i}
                   />
                 ))

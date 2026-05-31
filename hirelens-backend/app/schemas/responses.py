@@ -121,6 +121,7 @@ class InterviewQuestion(BaseModel):
 
     question: str
     star_framework: str
+    category: str = "behavioral"  # behavioral | technical | role-specific
 
 
 class InterviewPrepResponse(BaseModel):

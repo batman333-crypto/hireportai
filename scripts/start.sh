@@ -41,7 +41,9 @@ info "Checking Python virtual environment..."
 
 if [[ ! -d "$VENV_DIR" ]]; then
   warn "venv not found at $VENV_DIR — creating one..."
-  python3 -m venv "$VENV_DIR"
+  # Prefer Python 3.12 (spaCy requires <3.13); fall back to python3
+  PYTHON_BIN=$(command -v python3.12 || command -v python3 || echo "python3")
+  "$PYTHON_BIN" -m venv "$VENV_DIR"
   success "venv created."
 fi
 

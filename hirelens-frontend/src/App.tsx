@@ -8,10 +8,12 @@ import Rewrite from '@/pages/Rewrite'
 import Tracker from '@/pages/Tracker'
 import Pricing from '@/pages/Pricing'
 import Interview from '@/pages/Interview'
+import RecruiterRoast from '@/pages/RecruiterRoast'
+import LinkedInAudit from '@/pages/LinkedInAudit'
 
 export default function App() {
   const location = useLocation()
-  const isLanding = location.pathname === '/'
+  const isLanding = location.pathname === '/' || location.pathname === '/linkedin-audit'
 
   return (
     <div className="min-h-screen bg-bg-base text-text-primary font-body">
@@ -25,6 +27,8 @@ export default function App() {
           <Route path="/tracker" element={<Tracker />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/interview" element={<Interview />} />
+          <Route path="/roast" element={<RecruiterRoast />} />
+          <Route path="/linkedin-audit" element={<LinkedInAudit />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>

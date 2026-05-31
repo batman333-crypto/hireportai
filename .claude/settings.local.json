@@ -54,7 +54,15 @@
       "Bash(grep -r stripe /Users/yashu/GenAI/hirelensai --include=*.tsx --include=*.ts --include=*.py --exclude-dir=node_modules --exclude-dir=venv)",
       "Bash(grep -r checkout /Users/yashu/GenAI/hirelensai --include=*.tsx --include=*.ts --include=*.py --exclude-dir=node_modules --exclude-dir=venv)",
       "Bash(grep -r billing /Users/yashu/GenAI/hirelensai --include=*.tsx --include=*.ts --include=*.py --exclude-dir=node_modules --exclude-dir=venv)",
-      "Bash(python -c \"from app.services.nlp import get_nlp; nlp = get_nlp\\(\\); print\\(''spaCy available:'', nlp is not None\\)\")"
+      "Bash(python -c \"from app.services.nlp import get_nlp; nlp = get_nlp\\(\\); print\\(''spaCy available:'', nlp is not None\\)\")",
+      "Bash(brew --version)",
+      "Bash(brew install *)",
+      "Bash(python3.12 --version)",
+      "Bash(git -C /Users/yashu/GenAI/hirelensai status)",
+      "Bash(git -C /Users/yashu/GenAI/hirelensai log --oneline -3)",
+      "Bash(git -C /Users/yashu/GenAI/hirelensai diff scripts/start.sh)",
+      "Bash(git -C /Users/yashu/GenAI/hirelensai add -A)",
+      "Bash(git -C /Users/yashu/GenAI/hirelensai diff --cached --stat)"
     ]
   }
 }

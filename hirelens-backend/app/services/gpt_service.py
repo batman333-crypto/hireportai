@@ -2,6 +2,12 @@
 import json
 from typing import Any, Dict, List, Optional
 
+from app.services.resume_templates import (
+    auto_select_template,
+    get_roi_framework,
+    render_template_guidance,
+)
+from app.services.seniority import infer_seniority, render_seniority_block
 from app.models.response_models import (
     CoverLetterResponse,
     InterviewPrepResponse,
@@ -134,10 +140,18 @@ def generate_resume_rewrite(
     and sections. Returns structured data (header, sections with typed entries)
     so the frontend can render a properly formatted resume.
     """
-    resume_text = resume_data.get("full_text", "")[:4000]
+    resume_text = resume_data.get("full_text", "")[:6000]
     resume_skills = resume_data.get("skills", [])
     jd_skills = ", ".join(jd_requirements.get("all_skills", [])[:30])
     jd_title = jd_requirements.get("job_title", "the role")
+
+    # Resolve role-specific template (auto-detect if caller didn't pick one)
+    if not template_type or template_type == "general":
+        template_type = auto_select_template(major or "", jd_title)
+    template_block = render_template_guidance(template_type)
+    roi_framework = get_roi_framework(template_type)
+    seniority = infer_seniority(resume_data)
+    seniority_block = render_seniority_block(seniority)
     required_skills = ", ".join(jd_requirements.get("required_skills", [])[:20])
     responsibilities = jd_requirements.get("responsibilities", [])[:10]
 
@@ -175,6 +189,29 @@ def generate_resume_rewrite(
    - Contains JD-relevant keywords (+2 pts)
    ↳ EVERY bullet must start with an action verb, include a number/metric, and mention a JD keyword.
 
+═══ ROLE-SPECIFIC TEMPLATE (follow this section order and per-section guidance) ═══
+
+{template_block}
+
+═══ SENIORITY-ADAPTED SCORING (this resume is being scored on tier-specific weights) ═══
+
+{seniority_block}
+
+═══ ROI FRAMEWORK FOR THIS ROLE (every bullet must use this vocabulary) ═══
+
+{roi_framework}
+
+═══ "EARN YOUR PLACE" OUTPUT RULES (boardroom-ready output engine) ═══
+
+1. NO FLUFF VERBS: Reject "responsible for", "helped with", "worked on", "passionate about", "team player", "results-driven", "synergy", "thought leader". Replace with strong past-tense action verbs.
+2. QUANTIFICATION FLOOR: At least 70% of bullets MUST contain a number, %, $, or scope marker.
+3. VERB DIVERSITY: No action verb may repeat more than 2x across the entire resume.
+4. NO FIRST PERSON: Never use "I", "my", "we".
+5. NO PASSIVE VOICE: Less than 5% of sentences in passive voice.
+6. WORD DENSITY: Total resume between 350–600 words. Compress mercilessly.
+7. EARN YOUR PLACE: For every word in the rewritten resume, ask "does this word change the recruiter's decision?" If no, delete it.
+8. TIER MATCH: Bullets must match the seniority tier above. Do NOT include "relevant coursework" for a director. Do NOT claim "team leadership" for a student with no team.
+
 ═══ JOB CONTEXT ═══
 
 TARGET ROLE: {jd_title}
@@ -200,15 +237,17 @@ Read the original resume and map its content to these standard sections:
 ═══ CRITICAL RULES ═══
 
 1. NEVER FABRICATE: Keep real company names, titles, dates, GPA. Do NOT invent new jobs, projects, or experiences. Only create sections for content that EXISTS in the original.
-2. OPTIMIZE WORDING: Reposition and reword existing experience to emphasize relevance to the target role. Frame the SAME work using JD language.
-3. INFER REASONABLE METRICS: If the original says "improved performance", you can say "Improved performance by 25%" if the context supports it. If they "led a team", estimate the size from context. Keep inferences realistic.
-4. HEADER: Extract REAL name, email, phone, LinkedIn, location. NEVER use placeholders.
-5. ORG NAMES: Copy EXACTLY from original resume.
-6. ENTRIES vs CONTENT: Experience-type sections use "entries" array. Skills/Honors use "content" string.
-7. SKILLS SECTION: Group by category. Include ALL skills from original resume PLUS plausible missing skills. This section alone drives 25% of the score.
-8. BULLETS: 2-4 per entry. Every bullet = action verb + what you did + quantified result + JD keyword.
-9. REORDER sections to put most relevant experience first (e.g., if applying for a tech role, put EXPERIENCE before LEADERSHIP).
-10. FULL_TEXT: Must contain the complete rewritten resume as plain text.
+2. INCLUDE EVERYTHING: You MUST include EVERY experience, role, project, education entry, and organization from the original resume. Do NOT drop, skip, or merge any entries. If the original has 5 jobs, the output must have 5 jobs. If it has 3 projects, output 3 projects. Missing content is a critical failure.
+3. OPTIMIZE WORDING: Reposition and reword existing experience to emphasize relevance to the target role. Frame the SAME work using JD language.
+4. INFER REASONABLE METRICS: If the original says "improved performance", you can say "Improved performance by 25%" if the context supports it. If they "led a team", estimate the size from context. Keep inferences realistic.
+5. HEADER: Extract REAL name, email, phone, LinkedIn, location. NEVER use placeholders.
+6. ORG NAMES: Copy EXACTLY from original resume.
+7. ENTRIES vs CONTENT: Experience-type sections use "entries" array. Skills/Honors use "content" string.
+8. SKILLS SECTION: Group by category. Include ALL skills from original resume PLUS plausible missing skills. This section alone drives 25% of the score.
+9. BULLETS: 2-3 per entry. Every bullet = action verb + what you did + quantified result + JD keyword.
+10. REORDER sections to put most relevant experience first (e.g., if applying for a tech role, put EXPERIENCE before LEADERSHIP).
+11. FULL_TEXT: Must contain the complete rewritten resume as plain text.
+12. COMPLETENESS over brevity: It is MUCH better to include all content than to cut content for space. The PDF generator will auto-scale to fit one page.
 
 ═══ JSON OUTPUT FORMAT ═══
 
@@ -227,7 +266,7 @@ Read the original resume and map its content to these standard sections:
 {resume_text}"""
 
     try:
-        response_text = _generate(prompt, temperature=0.4, max_tokens=4000, json_mode=True)
+        response_text = _generate(prompt, temperature=0.4, max_tokens=8000, json_mode=True)
         data = json.loads(response_text)
 
         header = RewriteHeader(
@@ -363,50 +402,65 @@ def generate_interview_questions(
 The role requires: {required_skills}
 Candidate background: {resume_text[:800]}
 
-For each question, provide a STAR method answer framework (guidance on what to cover, not a full answer).
+For each question, provide a STAR method answer framework AND classify it into exactly one category:
+- "behavioral"  → soft-skills / past-experience questions ("Tell me about a time...")
+- "technical"   → tools, languages, system design, algorithms, hands-on knowledge
+- "role-specific" → questions about this specific job, company, motivation, culture fit, situational
 
 Return a JSON object:
 {{
   "questions": [
     {{
       "question": "The interview question",
-      "star_framework": "Situation: ... | Task: ... | Action: ... | Result: ..."
+      "star_framework": "Situation: ... | Task: ... | Action: ... | Result: ...",
+      "category": "behavioral"
     }}
   ]
 }}
 
-Mix: behavioral (3), technical (4), situational (2), culture fit (1).
-Make questions specific to the role and candidate's background."""
+You MUST produce: 4 behavioral, 4 technical, 2 role-specific. Every question MUST include the category field with one of the three exact values above. Make questions specific to the role and candidate's background."""
 
     try:
         response_text = _generate(prompt, temperature=0.7, max_tokens=2000, json_mode=True)
         data = json.loads(response_text)
-        questions = [
-            InterviewQuestion(question=q["question"], star_framework=q["star_framework"])
-            for q in data.get("questions", [])[:10]
-        ]
+        valid_cats = {"behavioral", "technical", "role-specific"}
+        questions = []
+        for q in data.get("questions", [])[:10]:
+            cat = str(q.get("category", "behavioral")).strip().lower()
+            if cat not in valid_cats:
+                cat = "behavioral"
+            questions.append(InterviewQuestion(
+                question=q["question"],
+                star_framework=q["star_framework"],
+                category=cat,
+            ))
         return InterviewPrepResponse(questions=questions)
     except Exception:
         default_questions = [
             InterviewQuestion(
                 question=f"Tell me about your experience with {required_skills.split(',')[0].strip() if required_skills else 'your main technical stack'}.",
                 star_framework="Situation: Describe a specific project | Task: Your role and the challenge | Action: Technologies used and decisions made | Result: Impact and learnings",
+                category="technical",
             ),
             InterviewQuestion(
                 question="Describe a time you had to learn a new technology quickly.",
                 star_framework="Situation: The project requiring new tech | Task: What you needed to learn | Action: Learning approach and resources | Result: How quickly you became productive",
+                category="behavioral",
             ),
             InterviewQuestion(
                 question="Tell me about your most challenging technical project.",
                 star_framework="Situation: Project complexity and constraints | Task: Your specific responsibilities | Action: Problem-solving approach | Result: Outcome and impact",
+                category="technical",
             ),
             InterviewQuestion(
                 question="How do you handle disagreements with team members about technical decisions?",
                 star_framework="Situation: A specific disagreement | Task: Finding the right solution | Action: Communication and compromise | Result: Team outcome",
+                category="behavioral",
             ),
             InterviewQuestion(
                 question="Where do you see yourself in 5 years?",
                 star_framework="Focus on growth in this field, leadership aspirations, and alignment with company mission",
+                category="role-specific",
             ),
         ]
         return InterviewPrepResponse(questions=default_questions)

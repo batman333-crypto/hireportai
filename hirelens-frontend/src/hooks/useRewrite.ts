@@ -36,6 +36,7 @@ export function useRewrite() {
 
   return {
     rewriteResult,
+    setRewriteResult,
     coverLetter,
     isLoadingRewrite,
     isLoadingCoverLetter,

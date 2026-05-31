@@ -33,7 +33,7 @@ export function MissingSkillsPanel({ skillGaps }: MissingSkillsPanelProps) {
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+      className="grid grid-cols-1 gap-3"
     >
       {skillGaps.map((gap) => {
         const Icon = IMPORTANCE_ICONS[gap.importance]
@@ -52,7 +52,7 @@ export function MissingSkillsPanel({ skillGaps }: MissingSkillsPanelProps) {
           >
             <Icon size={14} style={{ color, marginTop: 2, flexShrink: 0 }} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-text-primary truncate">{gap.skill}</p>
+              <p className="text-sm font-medium text-text-primary break-words leading-snug">{gap.skill}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span
                   className="text-xs px-1.5 py-0.5 rounded"

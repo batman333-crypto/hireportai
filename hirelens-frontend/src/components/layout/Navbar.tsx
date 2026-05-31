@@ -11,6 +11,7 @@ const navLinks = [
   { href: '/analyze', label: 'Analyze' },
   { href: '/results', label: 'Results' },
   { href: '/rewrite', label: 'Rewrite' },
+  { href: '/roast', label: 'Roast' },
   { href: '/interview', label: 'Interview' },
   { href: '/tracker', label: 'Tracker' },
   { href: '/pricing', label: 'Pricing' },
@@ -29,6 +30,12 @@ const PLAN_CONFIG = {
     color: 'text-accent-primary',
     border: 'border-accent-primary/40',
     icon: Crown,
+  },
+  guard: {
+    label: 'Guard',
+    color: 'text-emerald-400',
+    border: 'border-emerald-500/40',
+    icon: Sparkles,
   },
 }
 

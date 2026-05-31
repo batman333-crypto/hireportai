@@ -2,21 +2,24 @@ import { createContext, useContext, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import toast from 'react-hot-toast'
 
-export type PlanType = 'free' | 'pro' | 'premium'
+export type PlanType = 'free' | 'pro' | 'premium' | 'guard'
 
 interface UsageState {
   plan: PlanType
   scansUsed: number
-  maxScans: number  // 3 for free, Infinity for pro/premium
+  maxScans: number  // 3 for free, Infinity for pro/premium/guard
+  rushCredits: number  // one-time "Single-Job Deep Dive" credits
 }
 
 interface UsageContextValue {
   usage: UsageState
   canScan: boolean
-  canUsePro: boolean       // true for pro + premium
-  canUsePremium: boolean   // true for premium only
+  canUsePro: boolean
+  canUsePremium: boolean       // premium OR rush credit available
   incrementScan: () => void
   upgradePlan: (plan: PlanType) => void
+  addRushCredits: (count: number) => void
+  consumeRushCredit: () => boolean
   showUpgradeModal: boolean
   setShowUpgradeModal: (show: boolean) => void
   checkAndPromptUpgrade: () => boolean
@@ -28,6 +31,7 @@ const PLAN_LABELS: Record<PlanType, string> = {
   free: 'Free',
   pro: 'Pro',
   premium: 'Premium',
+  guard: 'Career Guard',
 }
 
 function loadUsage(): UsageState {
@@ -35,22 +39,25 @@ function loadUsage(): UsageState {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       const parsed = JSON.parse(stored)
+      const plan: PlanType = parsed.plan || 'free'
       return {
-        plan: parsed.plan || 'free',
+        plan,
         scansUsed: parsed.scansUsed || 0,
-        maxScans: parsed.plan === 'free' ? 3 : Infinity,
+        maxScans: plan === 'free' ? 3 : Infinity,
+        rushCredits: parsed.rushCredits || 0,
       }
     }
   } catch {
     // ignore
   }
-  return { plan: 'free', scansUsed: 0, maxScans: 3 }
+  return { plan: 'free', scansUsed: 0, maxScans: 3, rushCredits: 0 }
 }
 
 function saveUsage(usage: UsageState) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     plan: usage.plan,
     scansUsed: usage.scansUsed,
+    rushCredits: usage.rushCredits,
   }))
 }
 
@@ -61,8 +68,8 @@ export function UsageProvider({ children }: { children: ReactNode }) {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const canScan = usage.plan !== 'free' || usage.scansUsed < usage.maxScans
-  const canUsePro = usage.plan === 'pro' || usage.plan === 'premium'
-  const canUsePremium = usage.plan === 'premium'
+  const canUsePro = usage.plan === 'pro' || usage.plan === 'premium' || usage.plan === 'guard'
+  const canUsePremium = usage.plan === 'premium' || usage.rushCredits > 0
 
   const incrementScan = useCallback(() => {
     setUsage((prev) => {
@@ -78,11 +85,33 @@ export function UsageProvider({ children }: { children: ReactNode }) {
         plan,
         scansUsed: prev.scansUsed,
         maxScans: plan === 'free' ? 3 : Infinity,
+        rushCredits: prev.rushCredits,
       }
       saveUsage(next)
       return next
     })
     toast.success(`Upgraded to ${PLAN_LABELS[plan]}! 🎉`, { duration: 3000 })
+  }, [])
+
+  const addRushCredits = useCallback((count: number) => {
+    setUsage((prev) => {
+      const next = { ...prev, rushCredits: prev.rushCredits + count }
+      saveUsage(next)
+      return next
+    })
+    toast.success(`+${count} Rush Credit${count === 1 ? '' : 's'} added`, { duration: 2500 })
+  }, [])
+
+  const consumeRushCredit = useCallback((): boolean => {
+    let consumed = false
+    setUsage((prev) => {
+      if (prev.rushCredits <= 0) return prev
+      consumed = true
+      const next = { ...prev, rushCredits: prev.rushCredits - 1 }
+      saveUsage(next)
+      return next
+    })
+    return consumed
   }, [])
 
   const checkAndPromptUpgrade = useCallback((): boolean => {
@@ -102,6 +131,8 @@ export function UsageProvider({ children }: { children: ReactNode }) {
         canUsePremium,
         incrementScan,
         upgradePlan,
+        addRushCredits,
+        consumeRushCredit,
         showUpgradeModal,
         setShowUpgradeModal,
         checkAndPromptUpgrade,
