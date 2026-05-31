@@ -147,7 +147,7 @@ def generate_resume_rewrite(
     and sections. Returns structured data (header, sections with typed entries)
     so the frontend can render a properly formatted resume.
     """
-    resume_text = resume_data.get("full_text", "")[:4000]
+    resume_text = resume_data.get("full_text", "")[:8000]
     resume_skills = resume_data.get("skills", [])
     jd_skills = ", ".join(jd_requirements.get("all_skills", [])[:30])
     jd_title = jd_requirements.get("job_title", "the role")
@@ -186,18 +186,28 @@ REQUIRED SKILLS: {required_skills}
 KEY RESPONSIBILITIES:
 {resp_str}
 
-═══ FULL-PAGE RULES (CRITICAL) ═══
+═══ COMPLETENESS RULES — ZERO INFORMATION LOSS (MOST CRITICAL) ═══
 
-The resume MUST fill a full US Letter page (≈55–70 lines of content). To achieve this:
-- ALWAYS start with a PROFESSIONAL SUMMARY section (3–4 strong sentences tailored to the role)
-- MINIMUM 5–6 bullets per experience entry — expand and enrich every bullet using the XYZ formula
-- Each bullet must be 1–2 full lines long (100–150 characters), not a short fragment
-- Education: org + degree + GPA (if available) + Relevant Coursework line with 6–8 courses
-- Skills: expand to include ALL plausible related skills grouped into 6–8 categories
-- If the resume has Projects mentioned anywhere, add them as a Projects section with 3 bullets each
-- If the resume has Leadership / Activities / Certifications, include them
-- Do NOT omit sections — include everything and enrich it
-- Prioritize: SUMMARY > EXPERIENCE > SKILLS > EDUCATION > PROJECTS > LEADERSHIP
+You MUST include EVERY piece of information from the original resume. Missing anything is a failure.
+
+JOBS: Every single job, internship, or role listed — include ALL of them with their exact company name and dates.
+EDUCATION: Every degree, school, certificate, bootcamp, or academic program listed.
+CERTIFICATIONS: Every certification, license, or credential — list all of them in a CERTIFICATIONS section.
+PROJECTS: Every project mentioned — include ALL in a PROJECTS section with 3–4 bullets each.
+SKILLS: Every tool, language, framework, and technology already listed — keep them ALL, then add more.
+LEADERSHIP / ACTIVITIES / AWARDS / HONORS: Any of these present → include the full section.
+COURSEWORK / GPA: If mentioned anywhere, include it.
+
+Do NOT drop any job, any school, any cert, any project, any skill. If in doubt, include it.
+
+═══ FULL-PAGE ENRICHMENT RULES ═══
+
+Beyond preserving everything, enrich the content to fill a full US Letter page (≈55–70 lines):
+- ALWAYS add a PROFESSIONAL SUMMARY section first (3–4 strong sentences tailored to the role)
+- MINIMUM 5–6 bullets per experience entry — expand every bullet using the XYZ formula
+- Each bullet: 100–150 characters, action verb + task + quantified result + JD keyword
+- Education entries: add a "Relevant Coursework: ..." detail line with 6–8 courses
+- Skills: expand to 6–8 categories with all adjacent/inferred skills added
 
 ═══ FORMAT (matching professional template) ═══
 
@@ -210,10 +220,11 @@ Bullets: •  action verb + task + metric + keyword (no period at end)
 1. NEVER FABRICATE new jobs, degrees, or companies. Only reword/expand what EXISTS in the original.
 2. REAL DATA ONLY: Extract name, email, phone, LinkedIn, GPA from the original. Never use placeholders.
 3. ORG NAMES: Copy exactly from original resume.
-4. METRICS: If original says "improved X", you MUST add a specific percentage or number (e.g., "by 30%") — use reasonable estimates based on context.
-5. SKILLS SECTION: Group by category (e.g., "Programming: Python, SQL, R | Tools: Excel, Tableau | Soft Skills: Leadership, Communication").
-6. ENTRIES use "entries" array. SKILLS/SUMMARY/HONORS use "content" string.
-7. PROFESSIONAL SUMMARY uses "content" field (no entries), 3–4 sentences.
+4. METRICS: If original says "improved X", you MUST add a specific percentage or number — use reasonable estimates.
+5. SKILLS SECTION: Group by category (e.g., "Programming: Python, SQL | Tools: Excel, Tableau").
+6. Experience/Projects/Education ENTRIES use "entries" array. SKILLS/SUMMARY/CERTIFICATIONS use "content" string.
+7. PROFESSIONAL SUMMARY uses "content" field (3–4 sentences, no entries array).
+8. CERTIFICATIONS section: list each cert as a plain line in "content" (e.g., "AWS Solutions Architect – Associate (2023)\nGoogle Professional ML Engineer (2024)").
 
 ═══ JSON OUTPUT ═══
 
