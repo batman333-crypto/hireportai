@@ -160,7 +160,7 @@ def generate_resume_rewrite(
     resume_sk_str = ", ".join(resume_skills[:30])
     resp_str = "\n".join(f"- {r}" for r in responsibilities) if responsibilities else "N/A"
 
-    prompt = f"""You are an elite ATS optimization expert and professional resume writer. Rewrite this resume to achieve the HIGHEST POSSIBLE ATS score for the target role while keeping it on ONE PAGE.
+    prompt = f"""You are an elite ATS optimization expert and professional resume writer. Your job is to rewrite this resume to fill a FULL PAGE and achieve the HIGHEST POSSIBLE ATS score for the target role.
 
 ═══ ATS SCORING CRITERIA ═══
 
@@ -176,7 +176,7 @@ def generate_resume_rewrite(
 
 4. FORMATTING (10%): Single column, standard headings, no tables/graphics. ATS parsers fail on complex layouts.
 
-5. BULLET STRENGTH (10%): Action verb + specific task + quantified result + JD keyword. Every bullet.
+5. BULLET STRENGTH (10%): Use the Google XYZ formula for EVERY bullet: "Accomplished [X] as measured by [Y], by doing [Z]". Action verb + specific task + quantified result + JD keyword.
 
 ═══ JOB CONTEXT ═══
 
@@ -186,17 +186,20 @@ REQUIRED SKILLS: {required_skills}
 KEY RESPONSIBILITIES:
 {resp_str}
 
-═══ ONE-PAGE RULES (CRITICAL) ═══
+═══ FULL-PAGE RULES (CRITICAL) ═══
 
-This resume MUST fit on a single page. To achieve this:
-- MAX 3-4 bullets per experience entry (keep each under 120 characters)
-- Education: org + degree + GPA + 1 line of relevant coursework (no more)
-- Projects: 2 bullets each maximum
-- Skills: single-line categories, no redundancy
-- Omit sections with no content relevant to this role
-- Prioritize: EXPERIENCE > SKILLS > EDUCATION > PROJECTS > LEADERSHIP (reorder for the role)
+The resume MUST fill a full US Letter page (≈55–70 lines of content). To achieve this:
+- ALWAYS start with a PROFESSIONAL SUMMARY section (3–4 strong sentences tailored to the role)
+- MINIMUM 5–6 bullets per experience entry — expand and enrich every bullet using the XYZ formula
+- Each bullet must be 1–2 full lines long (100–150 characters), not a short fragment
+- Education: org + degree + GPA (if available) + Relevant Coursework line with 6–8 courses
+- Skills: expand to include ALL plausible related skills grouped into 6–8 categories
+- If the resume has Projects mentioned anywhere, add them as a Projects section with 3 bullets each
+- If the resume has Leadership / Activities / Certifications, include them
+- Do NOT omit sections — include everything and enrich it
+- Prioritize: SUMMARY > EXPERIENCE > SKILLS > EDUCATION > PROJECTS > LEADERSHIP
 
-═══ FORMAT (matching professional UT-style template) ═══
+═══ FORMAT (matching professional template) ═══
 
 Header: Name (centered, bold) + contact line (phone | email | linkedin | City, State)
 Sections: Bold underlined header left-aligned, company bold + date right-aligned, title italic
@@ -204,21 +207,23 @@ Bullets: •  action verb + task + metric + keyword (no period at end)
 
 ═══ CRITICAL RULES ═══
 
-1. NEVER FABRICATE new jobs, degrees, or projects. Only reword what EXISTS in the original.
+1. NEVER FABRICATE new jobs, degrees, or companies. Only reword/expand what EXISTS in the original.
 2. REAL DATA ONLY: Extract name, email, phone, LinkedIn, GPA from the original. Never use placeholders.
 3. ORG NAMES: Copy exactly from original resume.
-4. METRICS: If original says "improved X", you may add "by ~20-30%" if reasonable context supports it.
+4. METRICS: If original says "improved X", you MUST add a specific percentage or number (e.g., "by 30%") — use reasonable estimates based on context.
 5. SKILLS SECTION: Group by category (e.g., "Programming: Python, SQL, R | Tools: Excel, Tableau | Soft Skills: Leadership, Communication").
-6. ENTRIES use "entries" array. SKILLS/HONORS use "content" string.
+6. ENTRIES use "entries" array. SKILLS/SUMMARY/HONORS use "content" string.
+7. PROFESSIONAL SUMMARY uses "content" field (no entries), 3–4 sentences.
 
 ═══ JSON OUTPUT ═══
 
 {{
   "header": {{"name": "Full Name", "contact": "phone | email | linkedin | City, State"}},
   "sections": [
-    {{"title": "EDUCATION", "content": "", "entries": [{{"org": "University Name, City, State", "date": "May 2027", "title": "Bachelor of Science in Major, GPA: X.XX", "details": ["Relevant Coursework: Course1, Course2"], "bullets": []}}]}},
-    {{"title": "EXPERIENCE", "content": "", "entries": [{{"org": "Company Name, City, State", "date": "June 2023 – Present", "title": "Job Title", "details": [], "bullets": ["Led development of X using Python and AWS, reducing processing time by 35% and saving 10 engineering hours weekly", "Implemented Y algorithm resulting in 20% improvement in Z metric"]}}]}},
-    {{"title": "SKILLS", "content": "Programming Languages: Python, Java, SQL | Frameworks: React, FastAPI | Tools: Git, Docker, AWS | Soft Skills: Leadership, Agile, Communication", "entries": []}}
+    {{"title": "PROFESSIONAL SUMMARY", "content": "Results-driven AI Engineer with 3+ years of experience building LLM-powered applications and RAG pipelines at scale. Proven track record of deploying production GenAI systems using LangChain, LlamaIndex, and vector databases that reduced manual processing time by 40%. Deep expertise in fine-tuning transformer models and architecting agentic workflows aligned with enterprise reliability standards.", "entries": []}},
+    {{"title": "EXPERIENCE", "content": "", "entries": [{{"org": "Company Name, City, State", "date": "June 2023 – Present", "title": "Job Title", "details": [], "bullets": ["Architected and deployed RAG pipeline using LangChain and ChromaDB, improving document retrieval precision by 38% and reducing hallucination rate by 22% across 50K daily queries", "Led cross-functional team of 6 engineers to integrate GPT-4 and Gemini APIs into core product, cutting customer onboarding time by 45% and generating $1.2M in annual efficiency savings", "Implemented LoRA fine-tuning on Llama 3 model using QLoRA technique, achieving 91% task accuracy on domain-specific benchmarks while reducing GPU memory usage by 60%", "Designed LangGraph-based agentic workflow automating 12 financial reporting processes, eliminating 80 hours of manual work per month and reducing error rate to 0.3%", "Built evaluation framework using RAGAS and LangSmith, establishing automated regression testing that caught 94% of model degradation issues before production deployment"]}}]}},
+    {{"title": "EDUCATION", "content": "", "entries": [{{"org": "University Name, City, State", "date": "May 2027", "title": "Bachelor of Science in Major, GPA: X.XX", "details": ["Relevant Coursework: Machine Learning, Deep Learning, Natural Language Processing, Data Structures, Cloud Computing, Statistics"], "bullets": []}}]}},
+    {{"title": "SKILLS", "content": "GenAI & LLMs: GPT-4, Gemini, Llama 3, BERT, Claude | Agentic Frameworks: LangChain, LlamaIndex, LangGraph | RAG & Retrieval: RAG, Hybrid Search, Semantic Search | Vector Databases: ChromaDB, FAISS, Pinecone | Fine-Tuning: LoRA, QLoRA, PEFT | LLM Serving: vLLM, TGI, Ollama | Evaluation: RAGAS, LangSmith, MLflow | Programming: Python, SQL, R | Cloud & MLOps: AWS, GCP, Docker, Kubernetes | Databases: MongoDB, PostgreSQL, Redis | Data Engineering: Kafka, Spark, Airflow", "entries": []}}
   ],
   "full_text": "Complete resume as plain text (same content as structured data above)"
 }}
@@ -229,7 +234,7 @@ Bullets: •  action verb + task + metric + keyword (no period at end)
 
     ai_output = ""
     try:
-        ai_output = _generate(prompt, temperature=0.4, max_tokens=6000, json_mode=True)
+        ai_output = _generate(prompt, temperature=0.4, max_tokens=8000, json_mode=True)
         data = json.loads(ai_output)
 
         header = RewriteHeader(

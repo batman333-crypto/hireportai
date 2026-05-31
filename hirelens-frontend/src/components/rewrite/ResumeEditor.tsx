@@ -116,6 +116,8 @@ function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
         padding: '40px 48px',
         maxWidth: '780px',
         margin: '0 auto',
+        minHeight: '1056px', /* US Letter height at 96 DPI — always a full page */
+        boxSizing: 'border-box',
       }}
     >
       {/* Header */}
@@ -216,7 +218,7 @@ function ResumePreview({ rewrite }: { rewrite: RewriteResponse }) {
 /** Last-resort renderer: parse and format plain full_text into UT template layout */
 function PlainTextFallback({ text }: { text: string }) {
   const SECTION_RE =
-    /^(EDUCATION|EXPERIENCE|WORK EXPERIENCE|PROJECTS|SKILLS|TECHNICAL SKILLS|LEADERSHIP.*|CAMPUS INVOLVEMENT|HONORS.*|AWARDS|CERTIFICATIONS|RESEARCH.*|VOLUNTEER.*|ACTIVITIES)$/i
+    /^(PROFESSIONAL SUMMARY|SUMMARY|OBJECTIVE|EDUCATION|EXPERIENCE|WORK EXPERIENCE|PROJECTS|SKILLS|TECHNICAL SKILLS|LEADERSHIP.*|CAMPUS INVOLVEMENT|HONORS.*|AWARDS|CERTIFICATIONS|RESEARCH.*|VOLUNTEER.*|ACTIVITIES)$/i
 
   type FallbackBlock =
     | { type: 'header'; text: string }
@@ -283,6 +285,8 @@ function PlainTextFallback({ text }: { text: string }) {
         padding: '40px 48px',
         maxWidth: '780px',
         margin: '0 auto',
+        minHeight: '1056px', /* US Letter height at 96 DPI — always a full page */
+        boxSizing: 'border-box',
       }}
     >
       {nameBlock && (
