@@ -140,7 +140,7 @@ def generate_resume_rewrite(
     and sections. Returns structured data (header, sections with typed entries)
     so the frontend can render a properly formatted resume.
     """
-    resume_text = resume_data.get("full_text", "")[:6000]
+    resume_text = resume_data.get("full_text", "")[:20000]
     resume_skills = resume_data.get("skills", [])
     jd_skills = ", ".join(jd_requirements.get("all_skills", [])[:30])
     jd_title = jd_requirements.get("job_title", "the role")
@@ -237,7 +237,7 @@ Read the original resume and map its content to these standard sections:
 ═══ CRITICAL RULES ═══
 
 1. NEVER FABRICATE: Keep real company names, titles, dates, GPA. Do NOT invent new jobs, projects, or experiences. Only create sections for content that EXISTS in the original.
-2. INCLUDE EVERYTHING: You MUST include EVERY experience, role, project, education entry, and organization from the original resume. Do NOT drop, skip, or merge any entries. If the original has 5 jobs, the output must have 5 jobs. If it has 3 projects, output 3 projects. Missing content is a critical failure.
+2. INCLUDE EVERYTHING: You MUST include EVERY experience, role, project, education entry, certification, license, award, and organization from the original resume. Do NOT drop, skip, truncate, or merge any entries. If the original has 5 jobs, the output must have 5 jobs. If it has 3 projects, output 3 projects. If it has certifications, they MUST appear in a CERTIFICATIONS section. Missing content is a critical failure.
 3. OPTIMIZE WORDING: Reposition and reword existing experience to emphasize relevance to the target role. Frame the SAME work using JD language.
 4. INFER REASONABLE METRICS: If the original says "improved performance", you can say "Improved performance by 25%" if the context supports it. If they "led a team", estimate the size from context. Keep inferences realistic.
 5. HEADER: Extract REAL name, email, phone, LinkedIn, location. NEVER use placeholders.
@@ -266,7 +266,7 @@ Read the original resume and map its content to these standard sections:
 {resume_text}"""
 
     try:
-        response_text = _generate(prompt, temperature=0.4, max_tokens=8000, json_mode=True)
+        response_text = _generate(prompt, temperature=0.4, max_tokens=16000, json_mode=True)
         data = json.loads(response_text)
 
         header = RewriteHeader(
